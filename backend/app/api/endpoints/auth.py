@@ -85,6 +85,7 @@ async def login(
         return {
             "success": True,
             "message": "Login realizado com sucesso",
+            "timestamp": datetime.utcnow(),
             "data": {
                 "access_token": access_token,
                 "token_type": "bearer",
@@ -124,6 +125,7 @@ async def logout(current_user: dict = Depends(security_service.get_current_user)
     return {
         "success": True,
         "message": "Logout realizado com sucesso",
+        "timestamp": datetime.utcnow(),
         "data": None
     }
 
@@ -159,6 +161,7 @@ async def get_current_user_info(
         return {
             "success": True,
             "message": "Informações do usuário obtidas com sucesso",
+            "timestamp": datetime.utcnow(),
             "data": {
                 "id": user.id,
                 "username": user.username,
@@ -225,6 +228,7 @@ async def refresh_token(
         return {
             "success": True,
             "message": "Token renovado com sucesso",
+            "timestamp": datetime.utcnow(),
             "data": {
                 "access_token": access_token,
                 "token_type": "bearer",
@@ -293,6 +297,7 @@ async def change_password(
         return {
             "success": True,
             "message": "Senha alterada com sucesso",
+            "timestamp": datetime.utcnow(),
             "data": None
         }
         

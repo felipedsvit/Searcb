@@ -2,7 +2,8 @@
 
 # Script para inicializar o backend SEARCB
 # Autor: Sistema SEARCB
-# Data: 2024-01-15
+# Data: 2025-07-07
+# Versão: 2.0
 
 set -e
 

@@ -3,7 +3,7 @@ Schemas para Contratações
 """
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from decimal import Decimal
 
 from .common import PaginatedResponse, SuccessResponse, ErrorResponse
@@ -21,11 +21,12 @@ class ContratacaoItemBase(BaseModel):
     valor_unitario: Decimal = Field(..., gt=0, description="Valor unitário")
     valor_total: Decimal = Field(..., gt=0, description="Valor total")
     
-    @validator('valor_total')
-    def validate_valor_total(cls, v, values):
+    @field_validator('valor_total')
+    @classmethod
+    def validate_valor_total(cls, v, info):
         """Valida se o valor total está correto"""
-        if 'quantidade' in values and 'valor_unitario' in values:
-            calculated = values['quantidade'] * values['valor_unitario']
+        if info.data and 'quantidade' in info.data and 'valor_unitario' in info.data:
+            calculated = info.data['quantidade'] * info.data['valor_unitario']
             if abs(calculated - v) > Decimal('0.01'):
                 raise ValueError('Valor total não confere com quantidade x valor unitário')
         return v
@@ -77,7 +78,8 @@ class ContratacaoBase(BaseModel):
     data_encerramento: Optional[datetime] = Field(None, description="Data de encerramento")
     link_edital: Optional[str] = Field(None, max_length=500, description="Link do edital")
     
-    @validator('orgao_cnpj')
+    @field_validator('orgao_cnpj')
+    @classmethod
     def validate_cnpj(cls, v):
         """Valida CNPJ"""
         from ..utils.validators import validate_cnpj
@@ -140,11 +142,12 @@ class ContratacaoFilter(BaseModel):
     valor_minimo: Optional[Decimal] = Field(None, gt=0)
     valor_maximo: Optional[Decimal] = Field(None, gt=0)
     
-    @validator('valor_maximo')
-    def validate_valores(cls, v, values):
+    @field_validator('valor_maximo')
+    @classmethod
+    def validate_valores(cls, v, info):
         """Valida se valor máximo é maior que mínimo"""
-        if v and 'valor_minimo' in values and values['valor_minimo']:
-            if v <= values['valor_minimo']:
+        if v and info.data and 'valor_minimo' in info.data and info.data['valor_minimo']:
+            if v <= info.data['valor_minimo']:
                 raise ValueError('Valor máximo deve ser maior que o mínimo')
         return v
 

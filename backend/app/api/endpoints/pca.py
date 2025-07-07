@@ -22,13 +22,11 @@ from app.utils.helpers import paginate_query
 from app.middleware.rate_limiting import limiter
 from app.core.cache import get_cache, set_cache
 
-router = APIRouter(prefix="/pca", tags=["PCA"])
+router = APIRouter(tags=["PCA"])
 
 
 @router.get("", response_model=PaginatedResponse[PCAResponse])
-@limiter.limit("100/minute")
 async def listar_pcas(
-    request,
     filtros: PCAFilter = Depends(),
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(10, ge=1, le=100, description="Tamanho da página"),
@@ -96,9 +94,7 @@ async def listar_pcas(
 
 
 @router.get("/{pca_id}", response_model=PCAResponse)
-@limiter.limit("200/minute")
 async def obter_pca(
-    request,
     pca_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -126,9 +122,7 @@ async def obter_pca(
 
 
 @router.post("", response_model=PCAResponse)
-@limiter.limit("10/minute")
 async def criar_pca(
-    request,
     pca_data: PCACreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -172,9 +166,7 @@ async def criar_pca(
 
 
 @router.put("/{pca_id}", response_model=PCAResponse)
-@limiter.limit("10/minute")
 async def atualizar_pca(
-    request,
     pca_id: int,
     pca_data: PCAUpdate,
     db: Session = Depends(get_db),
@@ -212,9 +204,7 @@ async def atualizar_pca(
 
 
 @router.delete("/{pca_id}")
-@limiter.limit("5/minute")
 async def deletar_pca(
-    request,
     pca_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -258,9 +248,7 @@ async def deletar_pca(
 
 
 @router.get("/estatisticas/resumo")
-@limiter.limit("30/minute")
 async def obter_estatisticas_pca(
-    request,
     ano: Optional[int] = Query(None, description="Ano para filtrar"),
     orgao_cnpj: Optional[str] = Query(None, description="CNPJ do órgão"),
     db: Session = Depends(get_db),

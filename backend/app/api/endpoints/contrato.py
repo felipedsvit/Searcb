@@ -21,13 +21,11 @@ from app.utils.helpers import paginate_query
 from app.middleware.rate_limiting import limiter
 from app.core.cache import get_cache, set_cache
 
-router = APIRouter(prefix="/contratos", tags=["Contratos"])
+router = APIRouter(tags=["Contratos"])
 
 
 @router.get("", response_model=PaginatedResponse[ContratoResponse])
-@limiter.limit("100/minute")
 async def listar_contratos(
-    request,
     filtros: ContratoFilter = Depends(),
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(10, ge=1, le=100, description="Tamanho da página"),
@@ -109,9 +107,7 @@ async def listar_contratos(
 
 
 @router.get("/{contrato_id}", response_model=ContratoResponse)
-@limiter.limit("200/minute")
 async def obter_contrato(
-    request,
     contrato_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -140,9 +136,7 @@ async def obter_contrato(
 
 
 @router.post("", response_model=ContratoResponse)
-@limiter.limit("10/minute")
 async def criar_contrato(
-    request,
     contrato_data: ContratoCreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -210,9 +204,7 @@ async def criar_contrato(
 
 
 @router.put("/{contrato_id}", response_model=ContratoResponse)
-@limiter.limit("10/minute")
 async def atualizar_contrato(
-    request,
     contrato_id: int,
     contrato_data: ContratoUpdate,
     db: Session = Depends(get_db),
@@ -251,9 +243,7 @@ async def atualizar_contrato(
 
 
 @router.delete("/{contrato_id}")
-@limiter.limit("5/minute")
 async def deletar_contrato(
-    request,
     contrato_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -293,9 +283,7 @@ async def deletar_contrato(
 
 
 @router.get("/estatisticas/resumo")
-@limiter.limit("30/minute")
 async def obter_estatisticas_contrato(
-    request,
     ano: Optional[int] = Query(None, description="Ano para filtrar"),
     orgao_cnpj: Optional[str] = Query(None, description="CNPJ do órgão"),
     fornecedor_cnpj: Optional[str] = Query(None, description="CNPJ do fornecedor"),
@@ -429,9 +417,7 @@ async def obter_estatisticas_contrato(
 
 
 @router.get("/{contrato_id}/vigencia")
-@limiter.limit("50/minute")
 async def verificar_vigencia_contrato(
-    request,
     contrato_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -487,9 +473,7 @@ async def verificar_vigencia_contrato(
 
 
 @router.post("/{contrato_id}/prorrogar")
-@limiter.limit("10/minute")
 async def prorrogar_contrato(
-    request,
     contrato_id: int,
     nova_data_fim: str = Query(..., description="Nova data de fim (YYYY-MM-DD)"),
     justificativa: str = Query(..., description="Justificativa para prorrogação"),
@@ -559,9 +543,7 @@ async def prorrogar_contrato(
 
 
 @router.get("/{contrato_id}/historico")
-@limiter.limit("50/minute")
 async def obter_historico_contrato(
-    request,
     contrato_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)

@@ -1,4 +1,4 @@
-# Sistema PNCP - Backend
+# Sistema SEARCB - Backend
 
 Sistema de Gestão Pública integrado ao Portal Nacional de Contratações Públicas (PNCP), desenvolvido em Python com FastAPI, conforme a Lei nº 14.133/2021.
 
@@ -13,6 +13,10 @@ Sistema de Gestão Pública integrado ao Portal Nacional de Contratações Públ
 - **Rate limiting** e controle de acesso
 - **Monitoramento completo** com logs estruturados
 - **Documentação automática** com Swagger/OpenAPI
+- **Sistema de logs centralizado** para administração e auditoria
+- **Configurações dinâmicas** do sistema via interface admin
+- **Gestão de perfil de usuário** com configurações personalizáveis
+- **Notificações internas** para eventos do sistema
 
 ## 📋 Pré-requisitos
 
@@ -42,17 +46,38 @@ O script de instalação irá:
 - Configurar serviços systemd (opcional)
 - Configurar Nginx (opcional)
 
-## 🛠️ Instalação Manual
+## � Execução com Docker
 
-### 1. Ambiente Virtual
+Para executar o sistema completo usando Docker:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Iniciar todos os serviços
+docker compose up -d
+
+# Verificar status dos serviços
+docker compose ps
+
+# Verificar logs da aplicação
+docker compose logs -f app
 ```
 
-### 2. Configuração do Banco de Dados
+### Scripts Utilitários
+
+Foram adicionados novos scripts para facilitar o desenvolvimento e testes:
+
+```bash
+# Executar testes em ambiente Docker
+./run_tests_in_docker.sh
+
+# Executar apenas um conjunto específico de testes
+./run_tests_in_docker.sh tests/test_admin.py
+
+# Verificar funcionamento de todos os endpoints
+./verify_endpoints.sh
+
+# Iniciar a aplicação com todos os serviços
+./start.sh
+```
 
 ```sql
 -- PostgreSQL
@@ -150,6 +175,74 @@ Acesse a documentação interativa:
 
 - **Swagger UI**: http://localhost:8000/api/v1/docs
 - **ReDoc**: http://localhost:8000/api/v1/redoc
+
+## 📚 Endpoints API
+
+A API segue padrões RESTful e está versionada (v1). Todos os endpoints estão disponíveis em `/api/v1/`.
+
+### Endpoints Recém-Implementados
+
+#### 1. Webhooks Internos
+
+- **POST /webhooks/interno/notification** - Recebe notificações internas do sistema
+  - Autenticação: Requerida
+  - Rate limit: 50 requisições/minuto
+  - Tipos de notificação suportados:
+    - `contrato_vencendo` - Contrato próximo ao vencimento
+    - `pca_atualizado` - PCA foi atualizado
+    - `erro_sincronizacao` - Erro na sincronização com PNCP
+    - `limite_orcamento` - Limite orçamentário atingido
+
+#### 2. Endpoints de Administração
+
+- **GET /admin/logs** - Lista logs do sistema com filtros e paginação
+  - Autenticação: Requerida (apenas admin)
+  - Rate limit: 50 requisições/minuto
+  - Filtros disponíveis:
+    - `nivel` - Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    - `modulo` - Módulo/arquivo de origem
+    - `data_inicio` e `data_fim` - Período de tempo
+    - `termo_busca` - Busca na mensagem
+
+- **GET /admin/configuracoes** - Lista configurações do sistema
+  - Autenticação: Requerida (apenas admin)
+  - Rate limit: 100 requisições/minuto
+  - Filtros disponíveis:
+    - `categoria` - Categoria das configurações
+
+- **PUT /admin/configuracoes/{chave}** - Atualiza configuração específica
+  - Autenticação: Requerida (apenas admin)
+  - Rate limit: 10 requisições/minuto
+
+#### 3. Endpoints de Perfil de Usuário
+
+- **GET /usuarios/me/profile** - Obtém perfil do usuário atual
+  - Autenticação: Requerida
+  - Rate limit: 100 requisições/minuto
+
+- **PUT /usuarios/me/profile** - Atualiza perfil do usuário atual
+  - Autenticação: Requerida
+  - Rate limit: 20 requisições/minuto
+  - Campos atualizáveis:
+    - `nome_completo`
+    - `telefone`
+    - `cargo`
+    - `configuracoes`
+
+- **POST /usuarios/{id}/change-password** - Altera senha de usuário
+  - Autenticação: Requerida
+  - Rate limit: 5 requisições/minuto
+  - Permissões:
+    - Usuários podem alterar apenas a própria senha
+    - Administradores podem alterar senha de qualquer usuário
+
+### Documentação Completa
+
+Para a documentação completa da API, acesse:
+
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+- OpenAPI JSON: `/openapi.json`
 
 ## 🔗 Endpoints Principais
 

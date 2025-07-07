@@ -36,9 +36,7 @@ router = APIRouter()
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("100/hour")
 async def list_usuarios(
-    request,
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
     search: Optional[str] = Query(None, description="Busca por username, email ou nome"),
@@ -105,9 +103,7 @@ async def list_usuarios(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("200/hour")
 async def get_usuario(
-    request,
     usuario_id: int,
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -153,9 +149,7 @@ async def get_usuario(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("10/hour")
 async def create_usuario(
-    request,
     usuario_data: UsuarioCreate,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
@@ -189,9 +183,7 @@ async def create_usuario(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("20/hour")
 async def update_usuario(
-    request,
     usuario_id: int,
     usuario_data: UsuarioUpdate,
     current_user: Usuario = Depends(get_current_user),
@@ -239,9 +231,7 @@ async def update_usuario(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("5/hour")
 async def delete_usuario(
-    request,
     usuario_id: int,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
@@ -270,9 +260,7 @@ async def delete_usuario(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("5/hour")
 async def change_password(
-    request,
     usuario_id: int,
     password_data: ChangePasswordRequest,
     current_user: Usuario = Depends(get_current_user),
@@ -314,9 +302,7 @@ async def change_password(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("100/hour")
 async def list_perfis(
-    request,
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
     search: Optional[str] = Query(None, description="Busca por nome ou descrição"),
@@ -362,9 +348,7 @@ async def list_perfis(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("10/hour")
 async def create_perfil(
-    request,
     perfil_data: PerfilUsuarioCreate,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
@@ -391,9 +375,7 @@ async def create_perfil(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("100/hour")
 async def list_logs(
-    request,
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
     usuario_id: Optional[int] = Query(None, description="Filtrar por usuário"),
@@ -444,9 +426,7 @@ async def list_logs(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("100/hour")
 async def list_configuracoes(
-    request,
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
     categoria: Optional[str] = Query(None, description="Filtrar por categoria"),
@@ -492,9 +472,7 @@ async def list_configuracoes(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("10/hour")
 async def create_configuracao(
-    request,
     config_data: ConfiguracaoSistemaCreate,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
@@ -522,9 +500,7 @@ async def create_configuracao(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@limiter.limit("20/hour")
 async def update_configuracao(
-    request,
     chave: str,
     config_data: ConfiguracaoSistemaUpdate,
     current_user: Usuario = Depends(get_current_admin_user),
@@ -538,3 +514,156 @@ async def update_configuracao(
     config = await config_service.update_configuracao(chave, config_data)
     
     return config
+
+
+# Endpoints de Perfil de Usuário
+
+@router.get("/me/profile")
+async def obter_perfil_atual(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtém perfil do usuário atual
+    """
+    
+    perfil = {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "nome_completo": current_user.nome_completo,
+        "telefone": current_user.telefone,
+        "cargo": current_user.cargo,
+        "departamento": current_user.departamento,
+        "orgao_cnpj": current_user.orgao_cnpj,
+        "orgao_nome": current_user.orgao_nome,
+        "unidade_codigo": current_user.unidade_codigo,
+        "unidade_nome": current_user.unidade_nome,
+        "is_admin": current_user.is_admin,
+        "is_gestor": current_user.is_gestor,
+        "is_operador": current_user.is_operador,
+        "ativo": current_user.ativo,
+        "ultimo_login": current_user.ultimo_login,
+        "data_criacao": current_user.created_at
+    }
+    
+    return perfil
+
+
+@router.put("/me/profile")
+async def atualizar_perfil_atual(
+    nome_completo: Optional[str] = None,
+    telefone: Optional[str] = None,
+    cargo: Optional[str] = None,
+    departamento: Optional[str] = None,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Atualiza perfil do usuário atual
+    """
+    
+    # Campos que o usuário pode atualizar
+    campos_permitidos = {
+        "nome_completo": nome_completo,
+        "telefone": telefone,
+        "cargo": cargo,
+        "departamento": departamento
+    }
+    
+    # Atualizar apenas campos fornecidos
+    for campo, valor in campos_permitidos.items():
+        if valor is not None:
+            setattr(current_user, campo, valor)
+    
+    current_user.updated_at = datetime.now()
+    
+    try:
+        db.commit()
+        db.refresh(current_user)
+        
+        # Retornar perfil atualizado
+        return await obter_perfil_atual(None, current_user, db)
+        
+    except Exception as e:
+        db.rollback()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Erro ao atualizar perfil: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno ao atualizar perfil"
+        )
+
+
+@router.post("/{usuario_id}/change-password")
+async def alterar_senha_usuario(
+    usuario_id: int,
+    senha_atual: Optional[str] = None,
+    nova_senha: str = Query(..., min_length=8, description="Nova senha"),
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Altera senha de usuário
+    
+    Administradores podem alterar senha de qualquer usuário
+    Usuários comuns só podem alterar a própria senha
+    """
+    
+    # Verificar permissões
+    if usuario_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissão para alterar senha deste usuário"
+        )
+    
+    # Buscar usuário
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuário não encontrado"
+        )
+    
+    # Verificar senha atual (apenas para o próprio usuário)
+    if usuario_id == current_user.id:
+        if not senha_atual:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Senha atual é obrigatória"
+            )
+        
+        from app.core.security import SecurityService
+        security_service = SecurityService()
+        
+        if not security_service.verify_password(senha_atual, usuario.senha_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Senha atual incorreta"
+            )
+    
+    # Validar nova senha
+    if len(nova_senha) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nova senha deve ter pelo menos 8 caracteres"
+        )
+    
+    # Atualizar senha
+    from app.core.security import SecurityService
+    security_service = SecurityService()
+    
+    usuario.senha_hash = security_service.get_password_hash(nova_senha)
+    usuario.updated_at = datetime.now()
+    
+    db.commit()
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Senha alterada para usuário {usuario.username}")
+    
+    return {
+        "status": "success",
+        "message": "Senha alterada com sucesso"
+    }

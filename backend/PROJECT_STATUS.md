@@ -73,8 +73,8 @@ backend/
 │   └── env.py                 ✅ Configuração Alembic
 ├── requirements.txt           ✅ Dependências
 ├── Dockerfile                 ✅ Container Docker
-├── docker-compose.yml         ✅ Desenvolvimento
-├── docker-compose.prod.yml    ✅ Produção
+├── docker compose.yml         ✅ Desenvolvimento
+├── docker compose.prod.yml    ✅ Produção
 ├── nginx-prod.conf           ✅ Configuração Nginx
 ├── alembic.ini               ✅ Configuração Alembic
 ├── install.sh                ✅ Script de instalação
@@ -216,7 +216,7 @@ cd searcb/backend
 ./install.sh
 
 # Ou via Docker
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Inicialização

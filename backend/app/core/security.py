@@ -4,6 +4,7 @@ import jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
 import logging
 
 from .config import settings
@@ -57,7 +58,7 @@ class SecurityService:
                 detail="Token expired",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        except jwt.JWTError:
+        except jwt.InvalidTokenError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token",
@@ -101,6 +102,8 @@ security_service = SecurityService()
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """FastAPI dependency to get current user from token."""
     return security_service.get_current_user(credentials)
+
+
 
 
 def get_current_admin_user(credentials: HTTPAuthorizationCredentials = Depends(security)):

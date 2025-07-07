@@ -21,13 +21,11 @@ from app.utils.helpers import paginate_query
 from app.middleware.rate_limiting import limiter
 from app.core.cache import get_cache, set_cache
 
-router = APIRouter(prefix="/atas", tags=["Atas"])
+router = APIRouter(tags=["Atas"])
 
 
 @router.get("", response_model=PaginatedResponse[AtaResponse])
-@limiter.limit("100/minute")
 async def listar_atas(
-    request,
     filtros: AtaFilter = Depends(),
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(10, ge=1, le=100, description="Tamanho da página"),
@@ -105,9 +103,7 @@ async def listar_atas(
 
 
 @router.get("/{ata_id}", response_model=AtaResponse)
-@limiter.limit("200/minute")
 async def obter_ata(
-    request,
     ata_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -136,9 +132,7 @@ async def obter_ata(
 
 
 @router.post("", response_model=AtaResponse)
-@limiter.limit("10/minute")
 async def criar_ata(
-    request,
     ata_data: AtaCreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -195,9 +189,7 @@ async def criar_ata(
 
 
 @router.put("/{ata_id}", response_model=AtaResponse)
-@limiter.limit("10/minute")
 async def atualizar_ata(
-    request,
     ata_id: int,
     ata_data: AtaUpdate,
     db: Session = Depends(get_db),
@@ -236,9 +228,7 @@ async def atualizar_ata(
 
 
 @router.delete("/{ata_id}")
-@limiter.limit("5/minute")
 async def deletar_ata(
-    request,
     ata_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -281,9 +271,7 @@ async def deletar_ata(
 
 
 @router.get("/estatisticas/resumo")
-@limiter.limit("30/minute")
 async def obter_estatisticas_ata(
-    request,
     ano: Optional[int] = Query(None, description="Ano para filtrar"),
     orgao_cnpj: Optional[str] = Query(None, description="CNPJ do órgão"),
     situacao: Optional[str] = Query(None, description="Situação da ata"),
@@ -370,9 +358,7 @@ async def obter_estatisticas_ata(
 
 
 @router.get("/{ata_id}/fornecedores")
-@limiter.limit("50/minute")
 async def obter_fornecedores_ata(
-    request,
     ata_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -413,9 +399,7 @@ async def obter_fornecedores_ata(
 
 
 @router.get("/{ata_id}/vigencia")
-@limiter.limit("50/minute")
 async def verificar_vigencia_ata(
-    request,
     ata_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)

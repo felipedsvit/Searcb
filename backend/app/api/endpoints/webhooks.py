@@ -19,7 +19,7 @@ from app.middleware.rate_limiting import limiter
 from app.core.cache import get_cache, set_cache
 from app.core.config import settings
 
-router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
+router = APIRouter(tags=["Webhooks"])
 
 
 # Modelo para webhook (seria criado em models/webhook.py)
@@ -31,7 +31,6 @@ class WebhookEvent:
 
 
 @router.post("/pncp/notification")
-@limiter.limit("100/minute")
 async def receber_notificacao_pncp(
     request: Request,
     db: Session = Depends(get_db)
@@ -118,59 +117,119 @@ async def receber_notificacao_pncp(
 
 
 @router.post("/interno/notification")
-@limiter.limit("1000/minute")
 async def receber_notificacao_interna(
     request: Request,
-    event: Dict[str, Any],
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
 ):
     """
     Recebe notificações internas do sistema
+    
+    Tipos de notificação suportados:
+    - contrato_vencendo: Contrato próximo ao vencimento
+    - pca_atualizado: PCA foi atualizado
+    - erro_sincronizacao: Erro na sincronização com PNCP
+    - limite_orcamento: Limite orçamentário atingido
     """
+    
     try:
-        event_type = event.get('type')
-        event_data = event.get('data', {})
+        # Validar tipo de notificação
+        tipo = payload.get('tipo')
+        dados = payload.get('dados', {})
+        origem = payload.get('origem', 'sistema')
+        prioridade = payload.get('prioridade', 'normal')
         
-        # Log do evento
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"Evento interno recebido: {event_type} por usuário {current_user.id}")
+        if tipo not in ["contrato_vencendo", "pca_atualizado", "erro_sincronizacao", "limite_orcamento"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tipo de notificação inválido"
+            )
         
-        # Processar diferentes tipos de eventos internos
-        if event_type == 'user.login':
-            await processar_login_usuario(event_data, current_user, db)
-        elif event_type == 'user.logout':
-            await processar_logout_usuario(event_data, current_user, db)
-        elif event_type == 'data.export':
-            await processar_exportacao_dados(event_data, current_user, db)
-        elif event_type == 'system.backup':
-            await processar_backup_sistema(event_data, current_user, db)
-        elif event_type == 'alert.contract_expiry':
-            await processar_alerta_vencimento(event_data, current_user, db)
-        else:
-            logger.warning(f"Tipo de evento interno não reconhecido: {event_type}")
+        # Processar notificação de acordo com o tipo
+        if tipo == "contrato_vencendo":
+            await processar_contrato_vencendo(dados, db)
+        elif tipo == "pca_atualizado":
+            await processar_pca_atualizado(dados, db)
+        elif tipo == "erro_sincronizacao":
+            await processar_erro_sincronizacao(dados, db)
+        elif tipo == "limite_orcamento":
+            await processar_limite_orcamento(dados, db)
+        
+        # Registrar log do evento
+        from app.models.usuario import LogSistema
+        log = LogSistema(
+            usuario_id=current_user.id,
+            nivel="INFO",
+            categoria="WEBHOOK",
+            modulo="webhooks",
+            mensagem=f"Notificação interna processada: {tipo}",
+            detalhes=json.dumps(dados),
+            ip_origem=request.client.host,
+            user_agent=request.headers.get("user-agent"),
+            endpoint="/webhooks/interno/notification",
+            metodo_http="POST",
+            status_code=200,
+            contexto_adicional=json.dumps({
+                "origem": origem,
+                "prioridade": prioridade,
+                "tipo": tipo
+            })
+        )
+        db.add(log)
+        db.commit()
         
         return {
             "status": "success",
-            "message": "Evento interno processado com sucesso",
-            "event_type": event_type,
+            "message": "Notificação interna processada com sucesso",
+            "tipo": tipo,
             "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Erro ao processar evento interno: {e}")
-        
+        logger.error(f"Erro ao processar notificação interna: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno ao processar evento"
+            detail="Erro interno ao processar notificação"
         )
 
 
+async def processar_contrato_vencendo(dados: Dict[str, Any], db: Session):
+    """Processa notificação de contrato vencendo"""
+    contrato_id = dados.get('contrato_id')
+    dias_vencimento = dados.get('dias_vencimento', 0)
+    
+    # Implementar lógica específica para contratos vencendo
+    logger.info(f"Contrato {contrato_id} vence em {dias_vencimento} dias")
+
+
+async def processar_pca_atualizado(dados: Dict[str, Any], db: Session):
+    """Processa notificação de PCA atualizado"""
+    pca_id = dados.get('pca_id')
+    
+    # Implementar lógica específica para PCA atualizado
+    logger.info(f"PCA {pca_id} foi atualizado")
+
+
+async def processar_erro_sincronizacao(dados: Dict[str, Any], db: Session):
+    """Processa notificação de erro na sincronização"""
+    erro = dados.get('erro')
+    origem = dados.get('origem')
+    
+    # Implementar lógica específica para erros de sincronização
+    logger.error(f"Erro de sincronização em {origem}: {erro}")
+
+
+async def processar_limite_orcamento(dados: Dict[str, Any], db: Session):
+    """Processa notificação de limite orçamentário"""
+    limite_atual = dados.get('limite_atual')
+    limite_maximo = dados.get('limite_maximo')
+    
+    # Implementar lógica específica para limites orçamentários
+    logger.warning(f"Limite orçamentário atingido: {limite_atual}/{limite_maximo}")
+
+
 @router.get("/events")
-@limiter.limit("100/minute")
 async def listar_eventos(
     request: Request,
     event_type: Optional[str] = Query(None, description="Tipo de evento"),
@@ -221,7 +280,6 @@ async def listar_eventos(
 
 
 @router.post("/test")
-@limiter.limit("10/minute")
 async def testar_webhook(
     request: Request,
     event_type: str = Query(..., description="Tipo de evento para teste"),

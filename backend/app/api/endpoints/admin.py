@@ -9,6 +9,7 @@ from datetime import datetime, date, timedelta
 import json
 import csv
 import io
+import logging
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -22,21 +23,28 @@ from app.utils.helpers import paginate_query
 from app.middleware.rate_limiting import limiter
 from app.core.cache import get_cache, set_cache, clear_cache_pattern
 
-router = APIRouter(prefix="/admin", tags=["Administração"])
+router = APIRouter(tags=["Administração"])
 
 
 @router.get("/dashboard")
-@limiter.limit("100/minute")
 async def obter_dashboard(
-    request,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Obtém dados do dashboard administrativo
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -75,25 +83,25 @@ async def obter_dashboard(
     # Contratos próximos do vencimento
     data_90_dias = date.today() + timedelta(days=90)
     contratos_vencendo = db.query(Contrato).filter(
-        Contrato.data_fim_vigencia <= data_90_dias,
-        Contrato.situacao == "ATIVO"
+        Contrato.data_vigencia_fim <= data_90_dias,
+        Contrato.situacao_contrato == "ATIVO"
     ).count()
     
     # Top 5 órgãos por valor de contratos
     top_orgaos = db.query(
-        Contrato.orgao_nome,
+        Contrato.orgao_entidade_razao_social,
         func.sum(Contrato.valor_inicial).label('valor_total'),
         func.count(Contrato.id).label('total_contratos')
-    ).group_by(Contrato.orgao_nome).order_by(
+    ).group_by(Contrato.orgao_entidade_razao_social).order_by(
         func.sum(Contrato.valor_inicial).desc()
     ).limit(5).all()
     
     # Estatísticas por modalidade
     stats_modalidade = db.query(
-        Contratacao.modalidade,
+        Contratacao.modalidade_nome,
         func.count(Contratacao.id).label('quantidade'),
         func.sum(Contratacao.valor_total_estimado).label('valor')
-    ).group_by(Contratacao.modalidade).order_by(
+    ).group_by(Contratacao.modalidade_nome).order_by(
         func.count(Contratacao.id).desc()
     ).limit(5).all()
     
@@ -117,7 +125,7 @@ async def obter_dashboard(
         },
         "top_orgaos": [
             {
-                "nome": orgao.orgao_nome,
+                "nome": orgao.orgao_entidade_razao_social,
                 "valor_total": float(orgao.valor_total),
                 "total_contratos": orgao.total_contratos
             }
@@ -125,7 +133,7 @@ async def obter_dashboard(
         ],
         "modalidades": [
             {
-                "modalidade": mod.modalidade,
+                "modalidade": mod.modalidade_nome,
                 "quantidade": mod.quantidade,
                 "valor": float(mod.valor or 0)
             }
@@ -134,79 +142,137 @@ async def obter_dashboard(
     }
     
     # Cache por 15 minutos
-    await set_cache(cache_key, dashboard, expire=900)
+    await set_cache(cache_key, dashboard, ttl=900)
     
     return dashboard
 
 
 @router.get("/logs")
-@limiter.limit("50/minute")
-async def obter_logs(
-    request,
-    level: Optional[str] = Query(None, description="Nível do log"),
-    data_inicio: Optional[str] = Query(None, description="Data início"),
-    data_fim: Optional[str] = Query(None, description="Data fim"),
-    page: int = Query(1, ge=1, description="Página"),
+async def listar_logs(
+    page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(50, ge=1, le=200, description="Tamanho da página"),
-    current_user: Usuario = Depends(get_current_user),
+    nivel: Optional[str] = Query(None, description="Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)"),
+    modulo: Optional[str] = Query(None, description="Módulo/arquivo de origem"),
+    categoria: Optional[str] = Query(None, description="Categoria do log"),
+    data_inicio: Optional[date] = Query(None, description="Data de início (YYYY-MM-DD)"),
+    data_fim: Optional[date] = Query(None, description="Data de fim (YYYY-MM-DD)"),
+    termo_busca: Optional[str] = Query(None, description="Termo de busca na mensagem"),
+    usuario_id: Optional[int] = Query(None, description="ID do usuário"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Obtém logs do sistema
+    Lista logs do sistema com filtros e paginação
+    
+    Requer permissão de administrador
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
         )
     
-    # Esta implementação seria completa com um modelo de logs
-    # Por enquanto, retornar estrutura exemplo
+    # Importar modelo de logs
+    from app.models.usuario import LogSistema
     
-    logs_exemplo = [
-        {
-            "id": 1,
-            "timestamp": "2024-01-15T10:30:00",
-            "level": "INFO",
-            "message": "Usuário admin logado",
-            "module": "auth",
-            "user_id": current_user.id
-        },
-        {
-            "id": 2,
-            "timestamp": "2024-01-15T10:31:00",
-            "level": "INFO",
-            "message": "Sincronização PNCP iniciada",
-            "module": "sync",
-            "user_id": None
-        }
-    ]
+    # Construir query base
+    query = db.query(LogSistema)
+    
+    # Aplicar filtros
+    if nivel:
+        query = query.filter(LogSistema.nivel == nivel.upper())
+    
+    if modulo:
+        query = query.filter(LogSistema.modulo.ilike(f"%{modulo}%"))
+        
+    if categoria:
+        query = query.filter(LogSistema.categoria.ilike(f"%{categoria}%"))
+    
+    if data_inicio:
+        query = query.filter(LogSistema.created_at >= data_inicio)
+    
+    if data_fim:
+        query = query.filter(LogSistema.created_at <= data_fim)
+    
+    if termo_busca:
+        query = query.filter(LogSistema.mensagem.ilike(f"%{termo_busca}%"))
+        
+    if usuario_id:
+        query = query.filter(LogSistema.usuario_id == usuario_id)
+    
+    # Ordenar por timestamp decrescente
+    query = query.order_by(LogSistema.created_at.desc())
+    
+    # Contar total
+    total = query.count()
+    
+    # Aplicar paginação
+    skip = (page - 1) * size
+    logs = query.offset(skip).limit(size).all()
+    
+    # Paginar
+    result = paginate_query(query, page, size)
     
     return {
-        "data": logs_exemplo,
-        "total": len(logs_exemplo),
+        "data": [
+            {
+                "id": log.id,
+                "nivel": log.nivel,
+                "categoria": log.categoria,
+                "modulo": log.modulo,
+                "mensagem": log.mensagem,
+                "detalhes": log.detalhes,
+                "ip_origem": log.ip_origem,
+                "user_agent": log.user_agent,
+                "endpoint": log.endpoint,
+                "metodo_http": log.metodo_http,
+                "tempo_processamento": log.tempo_processamento,
+                "status_code": log.status_code,
+                "contexto_adicional": log.contexto_adicional,
+                "usuario_id": log.usuario_id,
+                "timestamp": log.created_at,
+                "updated_at": log.updated_at
+            } for log in logs
+        ],
+        "total": total,
         "page": page,
         "size": size,
-        "pages": 1
+        "pages": (total + size - 1) // size
     }
 
 
 @router.get("/users")
-@limiter.limit("50/minute")
 async def listar_usuarios(
-    request,
     ativo: Optional[bool] = Query(None, description="Status ativo"),
     page: int = Query(1, ge=1, description="Página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Lista usuários do sistema
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -215,7 +281,7 @@ async def listar_usuarios(
     query = db.query(Usuario)
     
     if ativo is not None:
-        query = query.filter(Usuario.is_active == ativo)
+        query = query.filter(Usuario.ativo == ativo)
     
     result = paginate_query(query, page, size)
     
@@ -227,19 +293,26 @@ async def listar_usuarios(
 
 
 @router.put("/users/{user_id}/status")
-@limiter.limit("10/minute")
 async def alterar_status_usuario(
-    request,
     user_id: int,
     ativo: bool = Query(..., description="Status ativo"),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Altera status de um usuário
     """
+    # Fetch user from database to check admin status
+    admin_user_id = current_user.get("sub")
+    admin_user = db.query(Usuario).filter(Usuario.id == int(admin_user_id)).first()
+    if not admin_user or not admin_user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not admin_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -253,34 +326,42 @@ async def alterar_status_usuario(
         )
     
     # Não permitir desativar o próprio usuário
-    if usuario.id == current_user.id and not ativo:
+    if usuario.id == admin_user.id and not ativo:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Não é possível desativar o próprio usuário"
         )
     
-    usuario.is_active = ativo
+    usuario.ativo = ativo
     db.commit()
     
     return {
         "message": f"Usuário {'ativado' if ativo else 'desativado'} com sucesso",
         "user_id": user_id,
-        "is_active": ativo
+        "ativo": ativo
     }
 
 
 @router.post("/cache/clear")
-@limiter.limit("5/minute")
 async def limpar_cache(
-    request,
     pattern: Optional[str] = Query(None, description="Padrão de chave"),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Limpa cache do sistema
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -300,16 +381,24 @@ async def limpar_cache(
 
 
 @router.get("/sync/status")
-@limiter.limit("30/minute")
 async def obter_status_sincronizacao(
-    request,
-    current_user: Usuario = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Obtém status das sincronizações
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -333,18 +422,26 @@ async def obter_status_sincronizacao(
 
 
 @router.post("/sync/manual")
-@limiter.limit("3/minute")
 async def executar_sincronizacao_manual(
-    request,
     data_inicio: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
     data_fim: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Executa sincronização manual
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -364,21 +461,28 @@ async def executar_sincronizacao_manual(
 
 
 @router.get("/export/data")
-@limiter.limit("5/minute")
 async def exportar_dados(
-    request,
     formato: str = Query(..., description="Formato: csv, json, xlsx"),
     entidade: str = Query(..., description="Entidade: pca, contratacao, ata, contrato"),
     data_inicio: Optional[str] = Query(None, description="Data início"),
     data_fim: Optional[str] = Query(None, description="Data fim"),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Exporta dados do sistema
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -428,17 +532,25 @@ async def exportar_dados(
 
 
 @router.post("/backup")
-@limiter.limit("2/minute")
 async def criar_backup(
-    request,
     incluir_arquivos: bool = Query(False, description="Incluir arquivos"),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Cria backup do sistema
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -456,17 +568,24 @@ async def criar_backup(
 
 
 @router.get("/system/health")
-@limiter.limit("100/minute")
 async def verificar_saude_sistema(
-    request,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Verifica saúde do sistema
     """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
     # Verificar permissões
-    if not current_user.is_admin:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a administradores"
@@ -524,6 +643,222 @@ async def verificar_saude_sistema(
         "celery": celery_status,
         "timestamp": datetime.now().isoformat()
     }
+
+
+# Endpoints de Configurações do Sistema
+
+@router.get("/configuracoes")
+async def listar_configuracoes(
+    categoria: Optional[str] = Query(None, description="Categoria das configurações"),
+    ativo: Optional[bool] = Query(None, description="Filtrar por configurações ativas"),
+    page: int = Query(1, ge=1, description="Número da página"),
+    size: int = Query(50, ge=1, le=200, description="Tamanho da página"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Lista configurações do sistema
+    
+    Requer permissão de administrador
+    """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
+    # Verificar permissões
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a administradores"
+        )
+    
+    # Verificar cache
+    cache_key = f"configuracoes_{categoria or 'all'}_{ativo}_{page}_{size}"
+    cached_result = await get_cache(cache_key)
+    if cached_result:
+        return cached_result
+    
+    # Importar modelo de configurações
+    from app.models.usuario import ConfiguracaoSistema
+    
+    # Construir query
+    query = db.query(ConfiguracaoSistema)
+    
+    if categoria:
+        query = query.filter(ConfiguracaoSistema.categoria == categoria)
+        
+    if ativo is not None:
+        query = query.filter(ConfiguracaoSistema.ativo == ativo)
+    
+    # Ordenar por categoria e chave
+    query = query.order_by(ConfiguracaoSistema.categoria, ConfiguracaoSistema.chave)
+    
+    # Contar total
+    total = query.count()
+    
+    # Aplicar paginação
+    skip = (page - 1) * size
+    configuracoes = query.offset(skip).limit(size).all()
+    
+    # Agrupar por categoria se não foi especificada uma categoria
+    if not categoria:
+        result = {}
+        for config in configuracoes:
+            if config.categoria not in result:
+                result[config.categoria] = []
+            
+            result[config.categoria].append({
+                "id": config.id,
+                "chave": config.chave,
+                "valor": config.valor,
+                "descricao": config.descricao,
+                "tipo": config.tipo,
+                "ativo": config.ativo,
+                "somente_leitura": config.somente_leitura,
+                "valor_padrao": config.valor_padrao,
+                "valor_minimo": config.valor_minimo,
+                "valor_maximo": config.valor_maximo,
+                "ultima_atualizacao": config.updated_at
+            })
+        
+        response = {
+            "data": result,
+            "total": total,
+            "page": page,
+            "size": size,
+            "pages": (total + size - 1) // size
+        }
+    else:
+        response = {
+            "data": [
+                {
+                    "id": config.id,
+                    "chave": config.chave,
+                    "valor": config.valor,
+                    "descricao": config.descricao,
+                    "tipo": config.tipo,
+                    "ativo": config.ativo,
+                    "somente_leitura": config.somente_leitura,
+                    "valor_padrao": config.valor_padrao,
+                    "valor_minimo": config.valor_minimo,
+                    "valor_maximo": config.valor_maximo,
+                    "ultima_atualizacao": config.updated_at
+                } for config in configuracoes
+            ],
+            "total": total,
+            "page": page,
+            "size": size,
+            "pages": (total + size - 1) // size
+        }
+    
+    # Cache por 1 hora
+    await set_cache(cache_key, response, ttl=3600)
+    
+    return response
+
+
+@router.put("/configuracoes/{chave}")
+async def atualizar_configuracao(
+    chave: str,
+    valor: str = Query(..., description="Novo valor da configuração"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Atualiza configuração específica
+    
+    Requer permissão de administrador
+    """
+    # Fetch user from database to check admin status
+    user_id = current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+    if not user or not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo ou não encontrado"
+        )
+    
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a administradores"
+        )
+    
+    # Importar modelo de configurações
+    from app.models.usuario import ConfiguracaoSistema
+    
+    # Buscar configuração
+    config = db.query(ConfiguracaoSistema).filter(
+        ConfiguracaoSistema.chave == chave
+    ).first()
+    
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Configuração não encontrada"
+        )
+    
+    if config.somente_leitura:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Esta configuração é somente leitura"
+        )
+    
+    # Validar tipo do valor
+    if not validar_tipo_configuracao(valor, config.tipo):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Valor inválido para o tipo {config.tipo}"
+        )
+    
+    # Atualizar configuração
+    config.valor = valor
+    config.updated_at = datetime.now()
+    
+    db.commit()
+    
+    # Invalidar cache
+    await clear_cache_pattern("configuracoes_*")
+    
+    # Log da alteração
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Configuração {chave} atualizada por usuário {user.username}")
+    
+    return {
+        "status": "success",
+        "message": "Configuração atualizada com sucesso",
+        "chave": chave,
+        "valor": valor
+    }
+
+
+def validar_tipo_configuracao(valor: str, tipo: str) -> bool:
+    """
+    Valida se o valor é compatível com o tipo da configuração
+    """
+    try:
+        if tipo == "INTEGER":
+            int(valor)
+        elif tipo == "BOOLEAN":
+            if valor.lower() not in ["true", "false", "1", "0"]:
+                return False
+        elif tipo == "STRING":
+            # String sempre é válida
+            pass
+        elif tipo == "JSON":
+            import json
+            json.loads(valor)
+        else:
+            return False
+        return True
+    except (ValueError, json.JSONDecodeError):
+        return False
 
 
 def exportar_csv(dados, entidade):

@@ -99,7 +99,7 @@ Para diferenciar a nRadar e entregar uma experiência superior, considere as seg
 
 # Comandos e Exemplos Técnicos
 
-## Exemplo de Estrutura docker-compose.yml
+## Exemplo de Estrutura docker compose.yml
 
 ```yaml
 version: "3.9"
