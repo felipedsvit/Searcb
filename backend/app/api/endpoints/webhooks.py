@@ -12,7 +12,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.contrato import Usuario
+from app.models.usuario import Usuario
 from app.schemas.common import PaginatedResponse
 from app.utils.helpers import paginate_query
 from app.middleware.rate_limiting import limiter

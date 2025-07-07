@@ -204,16 +204,14 @@ def check_contract_expiry():
         data_limite = date.today() + timedelta(days=30)
         
         contratos_vencendo = db.query(Contrato).filter(
-            Contrato.data_fim_vigencia <= data_limite,
-            Contrato.situacao == "ATIVO"
+            Contrato.data_vigencia_fim <= data_limite
         ).all()
         
         # Contratos vencendo em 7 dias (alerta crítico)
         data_limite_critica = date.today() + timedelta(days=7)
         
         contratos_criticos = db.query(Contrato).filter(
-            Contrato.data_fim_vigencia <= data_limite_critica,
-            Contrato.situacao == "ATIVO"
+            Contrato.data_vigencia_fim <= data_limite_critica
         ).all()
         
         # Aqui você poderia enviar notificações, emails, etc.
@@ -224,9 +222,9 @@ def check_contract_expiry():
             "contratos_criticos": [
                 {
                     "id": c.id,
-                    "numero": c.numero_contrato,
-                    "orgao": c.orgao_nome,
-                    "data_fim": c.data_fim_vigencia.isoformat()
+                    "numero": c.numero_contrato_empenho,
+                    "orgao": c.orgao_entidade_razao_social,
+                    "data_fim": c.data_vigencia_fim.isoformat() if c.data_vigencia_fim else None
                 }
                 for c in contratos_criticos
             ]
@@ -265,9 +263,9 @@ def generate_daily_reports():
             Contratacao.created_at < hoje
         ).count()
         
-        atas_criadas = db.query(Ata).filter(
-            Ata.created_at >= ontem,
-            Ata.created_at < hoje
+        atas_criadas = db.query(AtaRegistroPreco).filter(
+            AtaRegistroPreco.created_at >= ontem,
+            AtaRegistroPreco.created_at < hoje
         ).count()
         
         contratos_criados = db.query(Contrato).filter(
@@ -276,8 +274,9 @@ def generate_daily_reports():
         ).count()
         
         # Valor total dos contratos criados
+        from sqlalchemy import func
         valor_contratos = db.query(
-            db.func.sum(Contrato.valor_inicial)
+            func.sum(Contrato.valor_inicial)
         ).filter(
             Contrato.created_at >= ontem,
             Contrato.created_at < hoje
@@ -349,12 +348,13 @@ def update_cache_stats():
         # Estatísticas gerais
         total_pcas = db.query(PCA).count()
         total_contratacoes = db.query(Contratacao).count()
-        total_atas = db.query(Ata).count()
+        total_atas = db.query(AtaRegistroPreco).count()
         total_contratos = db.query(Contrato).count()
         
         # Valor total dos contratos
+        from sqlalchemy import func
         valor_total = db.query(
-            db.func.sum(Contrato.valor_inicial)
+            func.sum(Contrato.valor_inicial)
         ).scalar() or 0
         
         stats = {

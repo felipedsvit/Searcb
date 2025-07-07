@@ -20,7 +20,7 @@ from app.schemas.usuario import (
 )
 from app.schemas.common import ErrorResponse
 from app.models.usuario import Usuario
-from app.middleware.rate_limiting import rate_limit
+from app.middleware.rate_limiting import limiter
 
 router = APIRouter()
 
@@ -36,8 +36,9 @@ router = APIRouter()
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=100, window_seconds=3600)
+@limiter.limit("100/hour")
 async def list_usuarios(
+    request,
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
     search: Optional[str] = Query(None, description="Busca por username, email ou nome"),
@@ -104,8 +105,9 @@ async def list_usuarios(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=200, window_seconds=3600)
+@limiter.limit("200/hour")
 async def get_usuario(
+    request,
     usuario_id: int,
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -151,8 +153,9 @@ async def get_usuario(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=10, window_seconds=3600)
+@limiter.limit("10/hour")
 async def create_usuario(
+    request,
     usuario_data: UsuarioCreate,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
@@ -186,8 +189,9 @@ async def create_usuario(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=20, window_seconds=3600)
+@limiter.limit("20/hour")
 async def update_usuario(
+    request,
     usuario_id: int,
     usuario_data: UsuarioUpdate,
     current_user: Usuario = Depends(get_current_user),
@@ -235,8 +239,9 @@ async def update_usuario(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=5, window_seconds=3600)
+@limiter.limit("5/hour")
 async def delete_usuario(
+    request,
     usuario_id: int,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
@@ -265,8 +270,9 @@ async def delete_usuario(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=5, window_seconds=3600)
+@limiter.limit("5/hour")
 async def change_password(
+    request,
     usuario_id: int,
     password_data: ChangePasswordRequest,
     current_user: Usuario = Depends(get_current_user),
@@ -308,8 +314,9 @@ async def change_password(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=100, window_seconds=3600)
+@limiter.limit("100/hour")
 async def list_perfis(
+    request,
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
     search: Optional[str] = Query(None, description="Busca por nome ou descrição"),
@@ -355,8 +362,9 @@ async def list_perfis(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=10, window_seconds=3600)
+@limiter.limit("10/hour")
 async def create_perfil(
+    request,
     perfil_data: PerfilUsuarioCreate,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
@@ -383,8 +391,9 @@ async def create_perfil(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=100, window_seconds=3600)
+@limiter.limit("100/hour")
 async def list_logs(
+    request,
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
     usuario_id: Optional[int] = Query(None, description="Filtrar por usuário"),
@@ -435,8 +444,9 @@ async def list_logs(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=100, window_seconds=3600)
+@limiter.limit("100/hour")
 async def list_configuracoes(
+    request,
     page: int = Query(1, ge=1, description="Número da página"),
     size: int = Query(20, ge=1, le=100, description="Tamanho da página"),
     categoria: Optional[str] = Query(None, description="Filtrar por categoria"),
@@ -482,8 +492,9 @@ async def list_configuracoes(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=10, window_seconds=3600)
+@limiter.limit("10/hour")
 async def create_configuracao(
+    request,
     config_data: ConfiguracaoSistemaCreate,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
@@ -511,8 +522,9 @@ async def create_configuracao(
         500: {"model": ErrorResponse, "description": "Erro interno do servidor"}
     }
 )
-@rate_limit(max_requests=20, window_seconds=3600)
+@limiter.limit("20/hour")
 async def update_configuracao(
+    request,
     chave: str,
     config_data: ConfiguracaoSistemaUpdate,
     current_user: Usuario = Depends(get_current_admin_user),

@@ -10,7 +10,19 @@ O backend SEARCB é um sistema completo para gestão de contratações públicas
 
 - **FastAPI**: Framework web moderno para APIs Python
 - **SQLAlchemy**: ORM para interação com banco de dados
-- **PostgreSQL**: Banco de dados relacional principal
+- **PostgreSQL**: Banco de dados### Rate Limiting
+
+### Limites por Endpoint
+
+Os limites de requisições são configurados para os seguintes endpoints:
+
+- **Endpoints GET**: 100 requisições/minuto
+- **GET /usuarios**: 100 requisições/hora
+- **Outros endpoints**: Podem ter limites específicos configurados
+
+### Configuração
+
+Rate limiting é configurado por usuário usando Redis como backend. O middleware de rate limiting está implementado em `app/middleware/rate_limiting.py`.principal
 - **Redis**: Cache e broker para tarefas assíncronas
 - **Celery**: Processamento de tarefas em background
 - **Alembic**: Migrações de banco de dados
@@ -130,6 +142,11 @@ Lista PCAs com filtros e paginação.
 - `orgao_cnpj`: CNPJ do órgão
 - `status`: Status do PCA
 - `termo_busca`: Termo de busca livre
+- `data_inicio`: Data de início (formato: YYYY-MM-DD)
+- `data_fim`: Data de fim (formato: YYYY-MM-DD)
+- `valor_minimo`: Valor mínimo
+- `valor_maximo`: Valor máximo
+- `ordenar_por`: Campo para ordenação (data_publicacao, valor_total)
 
 **Example Request:**
 ```bash
@@ -191,13 +208,18 @@ Remove um PCA.
 Lista contratações com filtros e paginação.
 
 **Query Parameters:**
-- `page`: Número da página
-- `size`: Tamanho da página
+- `page`: Número da página (padrão: 1)
+- `size`: Tamanho da página (padrão: 10, máximo: 100)
+- `ano`: Ano da contratação
 - `modalidade`: Modalidade da contratação
 - `situacao`: Situação da contratação
 - `orgao_cnpj`: CNPJ do órgão
 - `data_inicio`: Data de início (formato: YYYY-MM-DD)
 - `data_fim`: Data de fim (formato: YYYY-MM-DD)
+- `valor_minimo`: Valor mínimo estimado
+- `valor_maximo`: Valor máximo estimado
+- `termo_busca`: Termo de busca (objeto, número ou órgão)
+- `ordenar_por`: Campo para ordenação (data_abertura, valor_estimado)
 
 #### GET /contratacoes/{id}
 Obtém detalhes de uma contratação específica.
@@ -216,6 +238,21 @@ Remove contratação.
 #### GET /atas
 Lista atas com filtros e paginação.
 
+**Query Parameters:**
+- `page`: Número da página (padrão: 1)
+- `size`: Tamanho da página (padrão: 10, máximo: 100)
+- `ano`: Ano da ata
+- `orgao_cnpj`: CNPJ do órgão
+- `situacao`: Situação da ata
+- `data_inicio`: Data de publicação inicial (formato: YYYY-MM-DD)
+- `data_fim`: Data de publicação final (formato: YYYY-MM-DD)
+- `valor_minimo`: Valor mínimo total
+- `valor_maximo`: Valor máximo total
+- `vigencia_inicio`: Data de início da vigência (formato: YYYY-MM-DD)
+- `vigencia_fim`: Data de fim da vigência (formato: YYYY-MM-DD)
+- `termo_busca`: Termo de busca (objeto, número ou órgão)
+- `ordenar_por`: Campo para ordenação (data_publicacao, valor_total, vigencia)
+
 #### GET /atas/{id}
 Obtém detalhes de uma ata específica.
 
@@ -232,6 +269,22 @@ Remove ata.
 
 #### GET /contratos
 Lista contratos com filtros e paginação.
+
+**Query Parameters:**
+- `page`: Número da página (padrão: 1)
+- `size`: Tamanho da página (padrão: 10, máximo: 100)
+- `ano`: Ano do contrato
+- `orgao_cnpj`: CNPJ do órgão
+- `fornecedor_cnpj`: CNPJ do fornecedor
+- `situacao`: Situação do contrato
+- `data_inicio`: Data de assinatura inicial (formato: YYYY-MM-DD)
+- `data_fim`: Data de assinatura final (formato: YYYY-MM-DD)
+- `valor_minimo`: Valor mínimo do contrato
+- `valor_maximo`: Valor máximo do contrato
+- `vigencia_inicio`: Data de início da vigência (formato: YYYY-MM-DD)
+- `vigencia_fim`: Data de fim da vigência (formato: YYYY-MM-DD)
+- `termo_busca`: Termo de busca (objeto, número, órgão ou fornecedor)
+- `ordenar_por`: Campo para ordenação (data_assinatura, valor_inicial, vigencia)
 
 #### GET /contratos/{id}
 Obtém detalhes de um contrato específico.
@@ -250,6 +303,14 @@ Remove contrato.
 #### GET /usuarios
 Lista usuários (apenas administradores).
 
+**Query Parameters:**
+- `page`: Número da página (padrão: 1)
+- `size`: Tamanho da página (padrão: 20, máximo: 100)
+- `search`: Busca por username, email ou nome
+- `ativo`: Filtrar por status ativo
+- `is_admin`: Filtrar por administradores
+- `orgao_cnpj`: Filtrar por CNPJ do órgão
+
 #### GET /usuarios/{id}
 Obtém detalhes de um usuário.
 
@@ -262,36 +323,58 @@ Atualiza usuário.
 #### DELETE /usuarios/{id}
 Remove usuário (apenas administradores).
 
-#### POST /usuarios/{id}/change-password
-Altera senha de usuário.
-
-#### GET /usuarios/me/profile
-Obtém perfil do usuário atual.
-
-#### PUT /usuarios/me/profile
-Atualiza perfil do usuário atual.
+**Observação**: Os endpoints de perfil de usuário e alteração de senha podem estar implementados em um módulo separado ou ainda estão em desenvolvimento.
 
 ### Webhooks
 
 #### POST /webhooks/pncp/notification
 Recebe notificações do PNCP.
 
-#### POST /webhooks/interno/notification
-Recebe notificações internas.
+**Observação**: Este endpoint verifica a assinatura da requisição usando HMAC com SHA-256 para garantir a autenticidade das notificações do PNCP.
 
 ### Administração
 
 #### GET /admin/dashboard
 Obtém dados do dashboard administrativo.
 
-#### GET /admin/logs
-Lista logs do sistema.
-
-#### GET /admin/configuracoes
-Lista configurações do sistema.
-
-#### PUT /admin/configuracoes/{chave}
-Atualiza configuração específica.
+**Response:**
+```json
+{
+  "estatisticas_gerais": {
+    "total_pcas": 120,
+    "total_contratacoes": 450,
+    "total_atas": 75,
+    "total_contratos": 310,
+    "total_usuarios": 85,
+    "valor_total_contratos": 25000000.00
+  },
+  "estatisticas_periodo": {
+    "pcas_30_dias": 15,
+    "contratacoes_30_dias": 45,
+    "atas_30_dias": 10,
+    "contratos_30_dias": 25
+  },
+  "alertas": {
+    "contratos_vencendo": 12
+  },
+  "top_orgaos": [
+    {
+      "orgao_nome": "Ministério da Educação",
+      "valor_total": 5000000.00,
+      "total_contratos": 45
+    },
+    // ... outros órgãos
+  ],
+  "stats_modalidade": [
+    {
+      "modalidade": "PREGÃO",
+      "quantidade": 200,
+      "valor": 15000000.00
+    },
+    // ... outras modalidades
+  ]
+}
+```
 
 ## Autenticação e Autorização
 
@@ -301,6 +384,28 @@ Atualiza configuração específica.
 2. **Token**: Sistema retorna JWT token
 3. **Autorização**: Token deve ser incluído no header `Authorization: Bearer <token>`
 4. **Validação**: Sistema valida token em cada requisição
+
+**Resposta de Login**:
+```json
+{
+  "success": true,
+  "message": "Login realizado com sucesso",
+  "data": {
+    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+    "token_type": "bearer",
+    "expires_in": 1800,
+    "user": {
+      "id": 1,
+      "username": "user@example.com",
+      "email": "user@example.com",
+      "nome_completo": "João Silva",
+      "is_admin": false,
+      "is_gestor": true,
+      "is_operador": true
+    }
+  }
+}
+```
 
 ### Níveis de Acesso
 
@@ -409,11 +514,11 @@ Verifica saúde da aplicação.
 ```json
 {
   "status": "healthy",
-  "timestamp": "2024-01-15T10:30:45Z",
-  "services": {
-    "database": "healthy",
-    "redis": "healthy",
-    "pncp_api": "healthy"
+  "timestamp": 1593536400,
+  "version": "1.0.0",
+  "components": {
+    "database": {"status": "healthy"},
+    "cache": {"status": "healthy"}
   }
 }
 ```
@@ -555,6 +660,16 @@ redis-cli ping
 - Verificar queries lentas no banco
 - Verificar hit rate do cache
 - Verificar uso de recursos do sistema
+
+## Notas de Implementação
+
+Este documento descreve a API SEARCB conforme a especificação original. Alguns endpoints e funcionalidades documentados aqui podem:
+
+- Estar em desenvolvimento e ainda não implementados completamente
+- Ter sido modificados durante a implementação
+- Ter comportamentos ou parâmetros diferentes dos descritos
+
+É recomendado consultar a documentação interativa da API em `/api/v1/docs` para obter a documentação mais atualizada dos endpoints disponíveis e seus parâmetros.
 
 ## Contato e Suporte
 

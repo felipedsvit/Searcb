@@ -12,10 +12,10 @@ import io
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.contrato import Usuario
+from app.models.usuario import Usuario
 from app.models.pca import PCA
 from app.models.contratacao import Contratacao
-from app.models.ata import Ata
+from app.models.ata import AtaRegistroPreco
 from app.models.contrato import Contrato
 from app.schemas.common import PaginatedResponse
 from app.utils.helpers import paginate_query
@@ -51,7 +51,7 @@ async def obter_dashboard(
     # Estatísticas gerais
     total_pcas = db.query(PCA).count()
     total_contratacoes = db.query(Contratacao).count()
-    total_atas = db.query(Ata).count()
+    total_atas = db.query(AtaRegistroPreco).count()
     total_contratos = db.query(Contrato).count()
     total_usuarios = db.query(Usuario).count()
     
@@ -67,7 +67,7 @@ async def obter_dashboard(
     contratacoes_30_dias = db.query(Contratacao).filter(
         Contratacao.created_at >= data_30_dias
     ).count()
-    atas_30_dias = db.query(Ata).filter(Ata.created_at >= data_30_dias).count()
+    atas_30_dias = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.created_at >= data_30_dias).count()
     contratos_30_dias = db.query(Contrato).filter(
         Contrato.created_at >= data_30_dias
     ).count()
@@ -403,7 +403,7 @@ async def exportar_dados(
     elif entidade == "contratacao":
         query = db.query(Contratacao)
     elif entidade == "ata":
-        query = db.query(Ata)
+        query = db.query(AtaRegistroPreco)
     elif entidade == "contrato":
         query = db.query(Contrato)
     

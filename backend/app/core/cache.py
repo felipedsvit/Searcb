@@ -223,3 +223,19 @@ async def clear_cache_pattern(pattern: str):
 # Global cache instances
 cache = CacheService()
 domain_cache = DomainCacheService()
+
+# Global cache instance
+cache_service = CacheService()
+
+# Helper functions for simpler API
+async def get_cache(key: str) -> Optional[Any]:
+    """Helper function to get value from cache."""
+    return await cache_service.get(key)
+
+async def set_cache(key: str, value: Any, ttl: Optional[int] = None) -> bool:
+    """Helper function to set value in cache with optional TTL."""
+    return await cache_service.set(key, value, ttl)
+
+async def delete_cache(key: str) -> bool:
+    """Helper function to delete key from cache."""
+    return await cache_service.delete(key)

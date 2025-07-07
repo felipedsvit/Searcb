@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 
@@ -95,3 +95,40 @@ class SecurityService:
 
 # Global security instance
 security_service = SecurityService()
+
+
+# Dependency function for FastAPI
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """FastAPI dependency to get current user from token."""
+    return security_service.get_current_user(credentials)
+
+
+def get_current_admin_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """FastAPI dependency to get current admin user from token."""
+    from .database import get_db
+    from ..models.usuario import Usuario
+    
+    # Get basic user info from token
+    payload = security_service.get_current_user(credentials)
+    user_id = payload.get("sub")
+    
+    # Get database session
+    db = next(get_db())
+    try:
+        # Fetch user from database to check admin status
+        user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        if not user.is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required"
+            )
+        
+        return user
+    finally:
+        db.close()

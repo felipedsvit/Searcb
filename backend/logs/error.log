@@ -31,3 +31,5 @@
 2025/07/07 07:08:22 [emerg] 1#1: host not found in upstream "app" in /etc/nginx/nginx.conf:13
 2025/07/07 07:09:14 [emerg] 1#1: host not found in upstream "app" in /etc/nginx/nginx.conf:13
 2025/07/07 07:10:16 [emerg] 1#1: host not found in upstream "app" in /etc/nginx/nginx.conf:13
+2025/07/07 09:57:39 [error] 30#30: *2 connect() failed (113: Host is unreachable) while connecting to upstream, client: 172.18.0.1, server: localhost, request: "GET / HTTP/1.1", upstream: "http://172.18.0.7:8000/", host: "localhost"
+2025/07/07 09:57:42 [error] 30#30: *5 connect() failed (113: Host is unreachable) while connecting to upstream, client: 172.18.0.1, server: localhost, request: "GET /favicon.ico HTTP/1.1", upstream: "http://172.18.0.7:8000/favicon.ico", host: "localhost", referrer: "http://localhost/"

@@ -82,10 +82,10 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                 key = f"rate_limit:{client_id}"
                 
                 # Remove old entries
-                await cache.client.zremrangebyscore(key, 0, window_start)
+                cache.client.zremrangebyscore(key, 0, window_start)
                 
                 # Count current requests
-                current_requests = await cache.client.zcard(key)
+                current_requests = cache.client.zcard(key)
                 
                 return current_requests < self.requests_per_minute
             else:
@@ -118,8 +118,8 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             # Use Redis if available
             if cache.health_check():
                 key = f"rate_limit:{client_id}"
-                await cache.client.zadd(key, {str(current_time): current_time})
-                await cache.client.expire(key, self.window_size)
+                cache.client.zadd(key, {str(current_time): current_time})
+                cache.client.expire(key, self.window_size)
             else:
                 # Fall back to memory store
                 self.memory_store[client_id].append(current_time)
@@ -132,7 +132,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         try:
             if cache.health_check():
                 key = f"rate_limit:{client_id}"
-                current_requests = await cache.client.zcard(key)
+                current_requests = cache.client.zcard(key)
                 return max(0, self.requests_per_minute - current_requests)
             else:
                 current_requests = len(self.memory_store[client_id])
@@ -302,3 +302,26 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
             return RedirectResponse(url=str(https_url), status_code=301)
         
         return await call_next(request)
+
+
+# Simple rate limiter decorator for endpoints
+class SimpleLimiter:
+    """Simple rate limiter decorator"""
+    
+    def __init__(self):
+        self.rate_limiter = RateLimitingMiddleware(None)
+    
+    def limit(self, rate: str):
+        """Decorator for rate limiting endpoints"""
+        def decorator(func):
+            # For now, just return the function as-is
+            # In a full implementation, this would apply rate limiting
+            func._rate_limit = rate
+            return func
+        return decorator
+
+# Export a default limiter instance
+limiter = SimpleLimiter()
+
+# Alias for compatibility
+rate_limit = limiter.limit

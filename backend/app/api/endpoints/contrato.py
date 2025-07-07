@@ -8,7 +8,8 @@ from sqlalchemy import and_, or_
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.contrato import Contrato, Usuario
+from app.models.contrato import Contrato
+from app.models.usuario import Usuario
 from app.schemas.contrato import (
     ContratoResponse,
     ContratoCreate,
@@ -185,8 +186,8 @@ async def criar_contrato(
     
     # Verificar se a ata existe
     if contrato_data.ata_id:
-        from app.models.ata import Ata
-        ata = db.query(Ata).filter(Ata.id == contrato_data.ata_id).first()
+        from app.models.ata import AtaRegistroPreco
+        ata = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.id == contrato_data.ata_id).first()
         
         if not ata:
             raise HTTPException(

@@ -3,7 +3,7 @@ Schemas para usuários e autenticação
 """
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 
 from .common import PaginatedResponse
 
@@ -21,7 +21,8 @@ class UsuarioBase(BaseModel):
     unidade_codigo: Optional[str] = Field(None, description="Código da unidade")
     unidade_nome: Optional[str] = Field(None, description="Nome da unidade")
     
-    @validator('username')
+    @field_validator('username')
+    @classmethod
     def validate_username(cls, v):
         if len(v) < 3:
             raise ValueError('Username deve ter pelo menos 3 caracteres')
@@ -36,11 +37,11 @@ class UsuarioCreate(UsuarioBase):
     is_gestor: bool = Field(False, description="Se é gestor")
     is_operador: bool = Field(True, description="Se é operador")
     
-    @validator('confirmar_senha')
-    def validate_passwords_match(cls, v, values):
-        if 'senha' in values and v != values['senha']:
+    @model_validator(mode='after')
+    def validate_passwords_match(self):
+        if self.confirmar_senha != self.senha:
             raise ValueError('Senhas não coincidem')
-        return v
+        return self
 
 
 class UsuarioUpdate(BaseModel):
@@ -81,8 +82,7 @@ class UsuarioResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 
 class UsuarioLogin(BaseModel):
@@ -153,8 +153,7 @@ class PerfilUsuarioResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 
 class UsuarioPerfilResponse(BaseModel):
@@ -170,8 +169,7 @@ class UsuarioPerfilResponse(BaseModel):
     usuario: UsuarioResponse
     perfil: PerfilUsuarioResponse
     
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 
 class LogSistemaResponse(BaseModel):
@@ -192,8 +190,7 @@ class LogSistemaResponse(BaseModel):
     contexto_adicional: Optional[str] = None
     created_at: datetime
     
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 
 class ConfiguracaoSistemaBase(BaseModel):
@@ -240,8 +237,7 @@ class ConfiguracaoSistemaResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 
 class ChangePasswordRequest(BaseModel):
@@ -250,11 +246,11 @@ class ChangePasswordRequest(BaseModel):
     senha_nova: str = Field(..., min_length=8, description="Nova senha")
     confirmar_senha_nova: str = Field(..., description="Confirmação da nova senha")
     
-    @validator('confirmar_senha_nova')
-    def validate_passwords_match(cls, v, values):
-        if 'senha_nova' in values and v != values['senha_nova']:
+    @model_validator(mode='after')
+    def validate_passwords_match(self):
+        if self.confirmar_senha_nova != self.senha_nova:
             raise ValueError('Senhas não coincidem')
-        return v
+        return self
 
 
 # Pagination responses

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List, Dict, Any, Union, Generic, TypeVar
 
 T = TypeVar('T')
@@ -21,11 +21,11 @@ class PaginationParams(BaseModel):
     pagina: int = Field(1, ge=1, description="Número da página")
     tamanho_pagina: int = Field(50, ge=1, le=500, description="Tamanho da página")
     
-    @validator('pagina', 'tamanho_pagina')
-    def validate_pagination(cls, v, values):
-        if 'tamanho_pagina' in values:
-            if not validate_pagination_params(values.get('pagina', 1), v, 500):
-                raise ValueError('Parâmetros de paginação inválidos')
+    @field_validator('tamanho_pagina')
+    @classmethod
+    def validate_pagination(cls, v):
+        if not validate_pagination_params(1, v, 500):
+            raise ValueError('Parâmetros de paginação inválidos')
         return v
 
 
@@ -51,11 +51,11 @@ class DateRangeFilter(BaseModel):
     data_inicio: date = Field(description="Data de início")
     data_fim: date = Field(description="Data de fim")
     
-    @validator('data_fim')
-    def validate_date_range(cls, v, values):
-        if 'data_inicio' in values and v < values['data_inicio']:
+    @model_validator(mode='after')
+    def validate_date_range(self):
+        if self.data_fim < self.data_inicio:
             raise ValueError('Data de fim deve ser maior que data de início')
-        return v
+        return self
 
 
 class OrgaoEntidade(BaseModel):
@@ -67,7 +67,8 @@ class OrgaoEntidade(BaseModel):
     esfera_id: Optional[str] = Field(None, max_length=1, description="ID da esfera")
     natureza_juridica_id: Optional[int] = Field(None, description="ID da natureza jurídica")
     
-    @validator('cnpj')
+    @field_validator('cnpj')
+    @classmethod
     def validate_cnpj_field(cls, v):
         if v and not validate_cnpj(v):
             raise ValueError('CNPJ inválido')
@@ -84,7 +85,8 @@ class UnidadeOrgao(BaseModel):
     uf_sigla: Optional[str] = Field(None, max_length=2, description="Sigla da UF")
     uf_nome: Optional[str] = Field(None, max_length=50, description="Nome da UF")
     
-    @validator('uf_sigla')
+    @field_validator('uf_sigla')
+    @classmethod
     def validate_uf_field(cls, v):
         if v and not validate_uf(v):
             raise ValueError('UF inválida')
@@ -108,14 +110,13 @@ class Fornecedor(BaseModel):
     porte_empresa_id: Optional[int] = Field(None, description="ID do porte da empresa")
     porte_empresa_nome: Optional[str] = Field(None, max_length=50, description="Nome do porte")
     
-    @validator('ni')
-    def validate_ni_field(cls, v, values):
-        tipo_pessoa = values.get('tipo_pessoa')
-        if tipo_pessoa == 'PF' and not validate_cpf(v):
+    @model_validator(mode='after')
+    def validate_ni_field(self):
+        if self.tipo_pessoa == 'PF' and not validate_cpf(self.ni):
             raise ValueError('CPF inválido')
-        elif tipo_pessoa == 'PJ' and not validate_cnpj(v):
+        elif self.tipo_pessoa == 'PJ' and not validate_cnpj(self.ni):
             raise ValueError('CNPJ inválido')
-        return v
+        return self
 
 
 class SearchFilters(BaseModel):
@@ -129,25 +130,29 @@ class SearchFilters(BaseModel):
     data_inicio: Optional[date] = Field(None, description="Data de início")
     data_fim: Optional[date] = Field(None, description="Data de fim")
     
-    @validator('modalidade_id')
+    @field_validator('modalidade_id')
+    @classmethod
     def validate_modalidade_id_field(cls, v):
         if v and not validate_modalidade_id(v):
             raise ValueError('Modalidade ID inválida')
         return v
     
-    @validator('situacao_id')
+    @field_validator('situacao_id')
+    @classmethod
     def validate_situacao_id_field(cls, v):
         if v and not validate_situacao_id(v):
             raise ValueError('Situação ID inválida')
         return v
     
-    @validator('uf')
+    @field_validator('uf')
+    @classmethod
     def validate_uf_field(cls, v):
         if v and not validate_uf(v):
             raise ValueError('UF inválida')
         return v
     
-    @validator('cnpj')
+    @field_validator('cnpj')
+    @classmethod
     def validate_cnpj_field(cls, v):
         if v and not validate_cnpj(v):
             raise ValueError('CNPJ inválido')
@@ -253,7 +258,8 @@ class ExportRequest(BaseModel):
     filters: Optional[Dict[str, Any]] = Field(None, description="Filtros de exportação")
     fields: Optional[List[str]] = Field(None, description="Campos a exportar")
     
-    @validator('format')
+    @field_validator('format')
+    @classmethod
     def validate_format(cls, v):
         allowed_formats = ['CSV', 'XLSX', 'JSON']
         if v.upper() not in allowed_formats:
@@ -288,8 +294,8 @@ class SystemInfo(BaseModel):
     database_status: str = Field(description="Status do banco de dados")
     cache_status: str = Field(description="Status do cache")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "name": "Sistema PNCP",
                 "version": "1.0.0",
@@ -303,3 +309,4 @@ class SystemInfo(BaseModel):
                 "cache_status": "healthy"
             }
         }
+    }

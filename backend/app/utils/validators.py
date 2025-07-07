@@ -2,7 +2,7 @@ import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
-from pydantic import validator
+# Removed Pydantic import as it's not needed in this module
 
 from .constants import (
     MODALIDADE_NAMES, SITUACAO_CONTRATACAO_NAMES, TIPO_CONTRATO_NAMES,
@@ -423,40 +423,4 @@ def is_valid_json(json_string: str) -> bool:
         return False
 
 
-class PydanticValidators:
-    """Pydantic validators for common fields."""
-    
-    @staticmethod
-    @validator('cnpj')
-    def validate_cnpj_field(cls, v):
-        if v and not validate_cnpj(v):
-            raise ValueError('CNPJ inválido')
-        return v
-    
-    @staticmethod
-    @validator('cpf')
-    def validate_cpf_field(cls, v):
-        if v and not validate_cpf(v):
-            raise ValueError('CPF inválido')
-        return v
-    
-    @staticmethod
-    @validator('email')
-    def validate_email_field(cls, v):
-        if v and not validate_email(v):
-            raise ValueError('Email inválido')
-        return v
-    
-    @staticmethod
-    @validator('uf')
-    def validate_uf_field(cls, v):
-        if v and not validate_uf(v):
-            raise ValueError('UF inválida')
-        return v
-    
-    @staticmethod
-    @validator('modalidade_id')
-    def validate_modalidade_id_field(cls, v):
-        if v and not validate_modalidade_id(v):
-            raise ValueError('Modalidade ID inválida')
-        return v
+# PydanticValidators class removed - validators are now used directly in schemas

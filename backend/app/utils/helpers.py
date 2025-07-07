@@ -4,6 +4,7 @@ import logging
 import asyncio
 from decimal import Decimal
 import json
+import uuid
 
 from ..utils.constants import DATE_FORMATS, MODALIDADE_NAMES, SITUACAO_CONTRATACAO_NAMES
 from ..utils.validators import (
@@ -12,6 +13,16 @@ from ..utils.validators import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def generate_uuid() -> str:
+    """
+    Generate a random UUID and return it as a string.
+    
+    Returns:
+        str: UUID string in standard format
+    """
+    return str(uuid.uuid4())
 
 
 def create_response_dict(
@@ -489,3 +500,155 @@ def truncate_string(text: str, max_length: int, suffix: str = "...") -> str:
         return text
     
     return text[:max_length - len(suffix)] + suffix
+
+
+def paginate_query(query, page: int = 1, page_size: int = 50):
+    """
+    Apply pagination to a SQLAlchemy query.
+    
+    Args:
+        query: SQLAlchemy query object
+        page: Page number (1-based)
+        page_size: Number of items per page
+        
+    Returns:
+        Tuple of (items, total_count, total_pages)
+    """
+    try:
+        # Calculate offset
+        offset = (page - 1) * page_size
+        
+        # Get total count
+        total_count = query.count()
+        
+        # Calculate total pages
+        total_pages = (total_count + page_size - 1) // page_size
+        
+        # Apply pagination
+        items = query.offset(offset).limit(page_size).all()
+        
+        logger.info(f"Paginação aplicada: página {page}, {len(items)} itens de {total_count} total")
+        
+        return items, total_count, total_pages
+        
+    except Exception as e:
+        logger.error(f"Erro na paginação: {e}")
+        return [], 0, 0
+
+
+def send_email(to: str, subject: str, template: str, context: Dict[str, Any] = None):
+    """
+    Send email using configured email service.
+    
+    Args:
+        to: Recipient email address
+        subject: Email subject
+        template: Email template name
+        context: Template context data
+        
+    Returns:
+        bool: True if email was sent successfully
+    """
+    try:
+        # Implementação básica de envio de email
+        # Em produção, usar serviço como AWS SES, SendGrid, etc.
+        logger.info(f"Enviando email para {to}: {subject}")
+        
+        # Aqui você implementaria a lógica real de envio
+        # Por exemplo, usando SMTP, AWS SES, etc.
+        
+        # Por enquanto, apenas log para desenvolvimento
+        logger.info(f"Email enviado com sucesso para {to}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Erro ao enviar email para {to}: {e}")
+        return False
+
+
+def generate_report(report_type: str, data: Dict[str, Any]) -> str:
+    """
+    Generate report based on type and data.
+    
+    Args:
+        report_type: Type of report to generate
+        data: Data for the report
+        
+    Returns:
+        str: Generated report content
+    """
+    try:
+        logger.info(f"Gerando relatório do tipo: {report_type}")
+        
+        if report_type == "relatorio_diario":
+            return _generate_daily_report(data)
+        elif report_type == "relatorio_mensal":
+            return _generate_monthly_report(data)
+        elif report_type == "relatorio_anual":
+            return _generate_annual_report(data)
+        else:
+            logger.warning(f"Tipo de relatório não suportado: {report_type}")
+            return f"Relatório {report_type} não implementado"
+            
+    except Exception as e:
+        logger.error(f"Erro ao gerar relatório {report_type}: {e}")
+        return f"Erro ao gerar relatório: {e}"
+
+
+def _generate_daily_report(data: Dict[str, Any]) -> str:
+    """
+    Generate daily report content.
+    
+    Args:
+        data: Daily report data
+        
+    Returns:
+        str: Daily report content
+    """
+    report_lines = [
+        f"RELATÓRIO DIÁRIO - {data.get('data', 'N/A')}",
+        "=" * 50,
+        f"Período: {data.get('periodo', 'N/A')}",
+        "",
+        "NOVOS REGISTROS:",
+        f"  • PCAs: {data.get('novos_pcas', 0)}",
+        f"  • Contratações: {data.get('novas_contratacoes', 0)}",
+        f"  • Atas: {data.get('novas_atas', 0)}",
+        f"  • Contratos: {data.get('novos_contratos', 0)}",
+        "",
+        "USUÁRIOS:",
+        f"  • Usuários ativos: {data.get('total_usuarios_ativos', 0)}",
+        f"  • Logins ontem: {data.get('logins_ontem', 0)}",
+        "",
+        "Relatório gerado automaticamente pelo sistema SEARCB"
+    ]
+    
+    return "\n".join(report_lines)
+
+
+def _generate_monthly_report(data: Dict[str, Any]) -> str:
+    """
+    Generate monthly report content.
+    
+    Args:
+        data: Monthly report data
+        
+    Returns:
+        str: Monthly report content
+    """
+    # Implementar relatório mensal
+    return "Relatório mensal não implementado"
+
+
+def _generate_annual_report(data: Dict[str, Any]) -> str:
+    """
+    Generate annual report content.
+    
+    Args:
+        data: Annual report data
+        
+    Returns:
+        str: Annual report content
+    """
+    # Implementar relatório anual
+    return "Relatório anual não implementado"

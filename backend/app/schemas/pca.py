@@ -3,10 +3,10 @@ Schemas para PCA (Plano de Contratações Anuais)
 """
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
 
-from .common import PaginatedResponse, SuccessResponse, SuccessResponse
+from .common import PaginatedResponse, SuccessResponse
 
 
 class PCAItemBase(BaseModel):
@@ -24,14 +24,14 @@ class PCAItemBase(BaseModel):
     modalidade_contratacao: str = Field(..., max_length=100, description="Modalidade de contratação")
     situacao: str = Field(..., max_length=50, description="Situação do item")
     
-    @validator('valor_total_estimado')
-    def validate_valor_total(cls, v, values):
+    @model_validator(mode='after')
+    def validate_valor_total(self):
         """Valida se o valor total está correto"""
-        if 'quantidade_estimada' in values and 'valor_unitario_estimado' in values:
-            calculated = values['quantidade_estimada'] * values['valor_unitario_estimado']
-            if abs(calculated - v) > Decimal('0.01'):
+        if self.quantidade_estimada and self.valor_unitario_estimado and self.valor_total_estimado:
+            calculated = self.quantidade_estimada * self.valor_unitario_estimado
+            if abs(calculated - self.valor_total_estimado) > Decimal('0.01'):
                 raise ValueError('Valor total não confere com quantidade x valor unitário')
-        return v
+        return self
 
 
 class PCAItemCreate(PCAItemBase):
@@ -60,8 +60,7 @@ class PCAItemResponse(PCAItemBase):
     criado_em: datetime
     atualizado_em: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class PCABase(BaseModel):
@@ -77,7 +76,8 @@ class PCABase(BaseModel):
     data_publicacao: Optional[datetime] = Field(None, description="Data de publicação")
     valor_total_estimado: Decimal = Field(..., gt=0, description="Valor total estimado do PCA")
     
-    @validator('orgao_cnpj')
+    @field_validator('orgao_cnpj')
+    @classmethod
     def validate_cnpj(cls, v):
         """Valida CNPJ"""
         from ..utils.validators import validate_cnpj
@@ -112,8 +112,7 @@ class PCAResponse(PCABase):
     sincronizado_em: Optional[datetime] = None
     itens: List[PCAItemResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class PCAFilter(BaseModel):
@@ -130,13 +129,13 @@ class PCAFilter(BaseModel):
     valor_minimo: Optional[Decimal] = Field(None, gt=0)
     valor_maximo: Optional[Decimal] = Field(None, gt=0)
     
-    @validator('valor_maximo')
-    def validate_valores(cls, v, values):
+    @model_validator(mode='after')
+    def validate_valores(self):
         """Valida se valor máximo é maior que mínimo"""
-        if v and 'valor_minimo' in values and values['valor_minimo']:
-            if v <= values['valor_minimo']:
+        if self.valor_maximo and self.valor_minimo:
+            if self.valor_maximo <= self.valor_minimo:
                 raise ValueError('Valor máximo deve ser maior que o mínimo')
-        return v
+        return self
 
 
 class PCAListResponse(SuccessResponse):

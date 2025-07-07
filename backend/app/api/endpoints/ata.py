@@ -8,8 +8,8 @@ from sqlalchemy import and_, or_
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.ata import Ata
-from app.models.contrato import Usuario
+from app.models.ata import AtaRegistroPreco
+from app.models.usuario import Usuario
 from app.schemas.ata import (
     AtaResponse,
     AtaCreate,
@@ -44,56 +44,56 @@ async def listar_atas(
         return cached_result
     
     # Construir query base
-    query = db.query(Ata)
+    query = db.query(AtaRegistroPreco)
     
     # Aplicar filtros
     if filtros.ano:
         query = query.filter(
-            db.func.extract('year', Ata.data_publicacao) == filtros.ano
+            db.func.extract('year', AtaRegistroPreco.data_publicacao) == filtros.ano
         )
     
     if filtros.orgao_cnpj:
-        query = query.filter(Ata.orgao_cnpj == filtros.orgao_cnpj)
+        query = query.filter(AtaRegistroPreco.orgao_cnpj == filtros.orgao_cnpj)
     
     if filtros.situacao:
-        query = query.filter(Ata.situacao == filtros.situacao)
+        query = query.filter(AtaRegistroPreco.situacao == filtros.situacao)
     
     if filtros.data_inicio:
-        query = query.filter(Ata.data_publicacao >= filtros.data_inicio)
+        query = query.filter(AtaRegistroPreco.data_publicacao >= filtros.data_inicio)
     
     if filtros.data_fim:
-        query = query.filter(Ata.data_publicacao <= filtros.data_fim)
+        query = query.filter(AtaRegistroPreco.data_publicacao <= filtros.data_fim)
     
     if filtros.valor_minimo:
-        query = query.filter(Ata.valor_total >= filtros.valor_minimo)
+        query = query.filter(AtaRegistroPreco.valor_total >= filtros.valor_minimo)
     
     if filtros.valor_maximo:
-        query = query.filter(Ata.valor_total <= filtros.valor_maximo)
+        query = query.filter(AtaRegistroPreco.valor_total <= filtros.valor_maximo)
     
     if filtros.vigencia_inicio:
-        query = query.filter(Ata.data_inicio_vigencia >= filtros.vigencia_inicio)
+        query = query.filter(AtaRegistroPreco.data_inicio_vigencia >= filtros.vigencia_inicio)
     
     if filtros.vigencia_fim:
-        query = query.filter(Ata.data_fim_vigencia <= filtros.vigencia_fim)
+        query = query.filter(AtaRegistroPreco.data_fim_vigencia <= filtros.vigencia_fim)
     
     if filtros.termo_busca:
         query = query.filter(
             or_(
-                Ata.orgao_nome.ilike(f"%{filtros.termo_busca}%"),
-                Ata.numero_ata.ilike(f"%{filtros.termo_busca}%"),
-                Ata.objeto.ilike(f"%{filtros.termo_busca}%")
+                AtaRegistroPreco.orgao_nome.ilike(f"%{filtros.termo_busca}%"),
+                AtaRegistroPreco.numero_ata.ilike(f"%{filtros.termo_busca}%"),
+                AtaRegistroPreco.objeto.ilike(f"%{filtros.termo_busca}%")
             )
         )
     
     # Aplicar ordenação
     if filtros.ordenar_por == "data_publicacao":
-        query = query.order_by(Ata.data_publicacao.desc())
+        query = query.order_by(AtaRegistroPreco.data_publicacao.desc())
     elif filtros.ordenar_por == "valor_total":
-        query = query.order_by(Ata.valor_total.desc())
+        query = query.order_by(AtaRegistroPreco.valor_total.desc())
     elif filtros.ordenar_por == "vigencia":
-        query = query.order_by(Ata.data_fim_vigencia.desc())
+        query = query.order_by(AtaRegistroPreco.data_fim_vigencia.desc())
     else:
-        query = query.order_by(Ata.created_at.desc())
+        query = query.order_by(AtaRegistroPreco.created_at.desc())
     
     # Paginar e executar
     result = paginate_query(query, page, size)
@@ -121,7 +121,7 @@ async def obter_ata(
     if cached_result:
         return cached_result
     
-    ata = db.query(Ata).filter(Ata.id == ata_id).first()
+    ata = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.id == ata_id).first()
     
     if not ata:
         raise HTTPException(
@@ -154,10 +154,10 @@ async def criar_ata(
         )
     
     # Verificar se número da ata já existe
-    existing_ata = db.query(Ata).filter(
+    existing_ata = db.query(AtaRegistroPreco).filter(
         and_(
-            Ata.numero_ata == ata_data.numero_ata,
-            Ata.orgao_cnpj == ata_data.orgao_cnpj
+            AtaRegistroPreco.numero_ata == ata_data.numero_ata,
+            AtaRegistroPreco.orgao_cnpj == ata_data.orgao_cnpj
         )
     ).first()
     
@@ -181,7 +181,7 @@ async def criar_ata(
             )
     
     # Criar ata
-    ata = Ata(**ata_data.dict())
+    ata = AtaRegistroPreco(**ata_data.dict())
     ata.usuario_id = current_user.id
     
     db.add(ata)
@@ -206,7 +206,7 @@ async def atualizar_ata(
     """
     Atualiza uma ata existente
     """
-    ata = db.query(Ata).filter(Ata.id == ata_id).first()
+    ata = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.id == ata_id).first()
     
     if not ata:
         raise HTTPException(
@@ -246,7 +246,7 @@ async def deletar_ata(
     """
     Deleta uma ata
     """
-    ata = db.query(Ata).filter(Ata.id == ata_id).first()
+    ata = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.id == ata_id).first()
     
     if not ata:
         raise HTTPException(
@@ -299,52 +299,52 @@ async def obter_estatisticas_ata(
         return cached_result
     
     # Query base
-    query = db.query(Ata)
+    query = db.query(AtaRegistroPreco)
     
     if ano:
         query = query.filter(
-            db.func.extract('year', Ata.data_publicacao) == ano
+            db.func.extract('year', AtaRegistroPreco.data_publicacao) == ano
         )
     
     if orgao_cnpj:
-        query = query.filter(Ata.orgao_cnpj == orgao_cnpj)
+        query = query.filter(AtaRegistroPreco.orgao_cnpj == orgao_cnpj)
     
     if situacao:
-        query = query.filter(Ata.situacao == situacao)
+        query = query.filter(AtaRegistroPreco.situacao == situacao)
     
     # Calcular estatísticas
     total_atas = query.count()
     valor_total = query.with_entities(
-        db.func.sum(Ata.valor_total)
+        db.func.sum(AtaRegistroPreco.valor_total)
     ).scalar() or 0
     
     # Atas vigentes
     import datetime
     atas_vigentes = query.filter(
         and_(
-            Ata.data_inicio_vigencia <= datetime.date.today(),
-            Ata.data_fim_vigencia >= datetime.date.today()
+            AtaRegistroPreco.data_inicio_vigencia <= datetime.date.today(),
+            AtaRegistroPreco.data_fim_vigencia >= datetime.date.today()
         )
     ).count()
     
     # Atas vencidas
     atas_vencidas = query.filter(
-        Ata.data_fim_vigencia < datetime.date.today()
+        AtaRegistroPreco.data_fim_vigencia < datetime.date.today()
     ).count()
     
     # Estatísticas por situação
     stats_situacao = db.query(
-        Ata.situacao,
-        db.func.count(Ata.id).label('quantidade'),
-        db.func.sum(Ata.valor_total).label('valor')
-    ).group_by(Ata.situacao)
+        AtaRegistroPreco.situacao,
+        db.func.count(AtaRegistroPreco.id).label('quantidade'),
+        db.func.sum(AtaRegistroPreco.valor_total).label('valor')
+    ).group_by(AtaRegistroPreco.situacao)
     
     if ano:
         stats_situacao = stats_situacao.filter(
-            db.func.extract('year', Ata.data_publicacao) == ano
+            db.func.extract('year', AtaRegistroPreco.data_publicacao) == ano
         )
     if orgao_cnpj:
-        stats_situacao = stats_situacao.filter(Ata.orgao_cnpj == orgao_cnpj)
+        stats_situacao = stats_situacao.filter(AtaRegistroPreco.orgao_cnpj == orgao_cnpj)
     
     stats_situacao = stats_situacao.all()
     
@@ -380,7 +380,7 @@ async def obter_fornecedores_ata(
     """
     Obtém lista de fornecedores da ata
     """
-    ata = db.query(Ata).filter(Ata.id == ata_id).first()
+    ata = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.id == ata_id).first()
     
     if not ata:
         raise HTTPException(
@@ -423,7 +423,7 @@ async def verificar_vigencia_ata(
     """
     Verifica a vigência de uma ata
     """
-    ata = db.query(Ata).filter(Ata.id == ata_id).first()
+    ata = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.id == ata_id).first()
     
     if not ata:
         raise HTTPException(

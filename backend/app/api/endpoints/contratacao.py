@@ -9,7 +9,7 @@ from sqlalchemy import and_, or_
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.contratacao import Contratacao
-from app.models.contrato import Usuario
+from app.models.usuario import Usuario
 from app.schemas.contratacao import (
     ContratacaoResponse,
     ContratacaoCreate,
@@ -250,10 +250,10 @@ async def deletar_contratacao(
         )
     
     # Verificar se há atas ou contratos vinculados
-    from app.models.ata import Ata
+    from app.models.ata import AtaRegistroPreco
     from app.models.contrato import Contrato
     
-    atas = db.query(Ata).filter(Ata.contratacao_id == contratacao_id).first()
+    atas = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.contratacao_id == contratacao_id).first()
     contratos = db.query(Contrato).filter(
         Contrato.contratacao_id == contratacao_id
     ).first()
@@ -419,8 +419,8 @@ async def obter_timeline_contratacao(
         })
     
     # Buscar atas relacionadas
-    from app.models.ata import Ata
-    atas = db.query(Ata).filter(Ata.contratacao_id == contratacao_id).all()
+    from app.models.ata import AtaRegistroPreco
+    atas = db.query(AtaRegistroPreco).filter(AtaRegistroPreco.contratacao_id == contratacao_id).all()
     
     for ata in atas:
         timeline.append({

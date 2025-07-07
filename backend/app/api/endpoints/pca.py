@@ -7,15 +7,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import security_service, get_current_user
 from app.models.pca import PCA
-from app.models.contrato import Usuario
+from app.models.usuario import Usuario
 from app.schemas.pca import (
     PCAResponse,
     PCACreate,
     PCAUpdate,
     PCAFilter,
-    PCAList
+    PCAListResponse
 )
 from app.schemas.common import PaginatedResponse
 from app.utils.helpers import paginate_query
