@@ -14,6 +14,7 @@ import logging
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.usuario import Usuario
+from app.schemas.admin import AtualizarConfiguracaoRequest
 from app.models.pca import PCA
 from app.models.contratacao import Contratacao
 from app.models.ata import AtaRegistroPreco
@@ -765,7 +766,7 @@ async def listar_configuracoes(
 @router.put("/configuracoes/{chave}")
 async def atualizar_configuracao(
     chave: str,
-    valor: str = Query(..., description="Novo valor da configuração"),
+    request_data: AtualizarConfiguracaoRequest,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -810,14 +811,14 @@ async def atualizar_configuracao(
         )
     
     # Validar tipo do valor
-    if not validar_tipo_configuracao(valor, config.tipo):
+    if not validar_tipo_configuracao(request_data.valor, config.tipo):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Valor inválido para o tipo {config.tipo}"
         )
     
     # Atualizar configuração
-    config.valor = valor
+    config.valor = request_data.valor
     config.updated_at = datetime.now()
     
     db.commit()
@@ -834,7 +835,7 @@ async def atualizar_configuracao(
         "status": "success",
         "message": "Configuração atualizada com sucesso",
         "chave": chave,
-        "valor": valor
+        "valor": request_data.valor
     }
 
 

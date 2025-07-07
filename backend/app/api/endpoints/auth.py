@@ -9,6 +9,7 @@ from ...core.security import security_service
 from ...core.config import settings
 from ...models.usuario import Usuario
 from ...schemas.common import SuccessResponse, ErrorResponse
+from ...schemas.usuario import UsuarioLogin, ChangePasswordRequest
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +19,52 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login
 
 
 @router.post("/login", response_model=SuccessResponse)
-async def login(
+async def login_form(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     """
-    Login endpoint for user authentication.
+    Login endpoint for user authentication using form data.
+    
+    **Parameters:**
+    - **username**: Username or email (form field)
+    - **password**: User password (form field)
+    
+    **Content-Type:** application/x-www-form-urlencoded
+    
+    **Returns:**
+    - **access_token**: JWT access token
+    - **token_type**: Token type (bearer)
+    - **expires_in**: Token expiration time in seconds
+    """
+    return await _perform_login(form_data.username, form_data.password, db)
+
+
+@router.post("/login-json", response_model=SuccessResponse)
+async def login_json(
+    login_data: UsuarioLogin,
+    db: Session = Depends(get_db)
+):
+    """
+    Login endpoint for user authentication using JSON data.
+    
+    **Parameters:**
+    - **username**: Username or email (JSON field)
+    - **password**: User password (JSON field)
+    
+    **Content-Type:** application/json
+    
+    **Returns:**
+    - **access_token**: JWT access token
+    - **token_type**: Token type (bearer)
+    - **expires_in**: Token expiration time in seconds
+    """
+    return await _perform_login(login_data.username, login_data.password, db)
+
+
+async def _perform_login(username: str, password: str, db: Session):
+    """
+    Perform user login with username/email and password.
     
     **Parameters:**
     - **username**: Username or email
@@ -37,12 +78,12 @@ async def login(
     try:
         # Find user by username or email
         user = db.query(Usuario).filter(
-            (Usuario.username == form_data.username) | 
-            (Usuario.email == form_data.username)
+            (Usuario.username == username) | 
+            (Usuario.email == username)
         ).first()
         
         if not user:
-            logger.warning(f"Login attempt with invalid username: {form_data.username}")
+            logger.warning(f"Login attempt with invalid username: {username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciais inválidas",
@@ -50,7 +91,7 @@ async def login(
             )
         
         # Verify password
-        if not security_service.verify_password(form_data.password, user.senha_hash):
+        if not security_service.verify_password(password, user.senha_hash):
             logger.warning(f"Login attempt with invalid password for user: {user.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -248,8 +289,7 @@ async def refresh_token(
 
 @router.post("/change-password", response_model=SuccessResponse)
 async def change_password(
-    old_password: str,
-    new_password: str,
+    password_data: ChangePasswordRequest,
     current_user: dict = Depends(security_service.get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -257,8 +297,9 @@ async def change_password(
     Change user password.
     
     **Parameters:**
-    - **old_password**: Current password
-    - **new_password**: New password
+    - **senha_atual**: Current password
+    - **senha_nova**: New password
+    - **confirmar_senha_nova**: New password confirmation
     
     **Returns:**
     - Success message
@@ -274,21 +315,14 @@ async def change_password(
             )
         
         # Verify old password
-        if not security_service.verify_password(old_password, user.senha_hash):
+        if not security_service.verify_password(password_data.senha_atual, user.senha_hash):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Senha atual incorreta"
             )
         
-        # Validate new password
-        if len(new_password) < 8:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nova senha deve ter pelo menos 8 caracteres"
-            )
-        
-        # Update password
-        user.senha_hash = security_service.get_password_hash(new_password)
+        # Update password (validation is already done by Pydantic)
+        user.senha_hash = security_service.get_password_hash(password_data.senha_nova)
         user.data_expiracao_senha = None  # Reset password expiration
         db.commit()
         

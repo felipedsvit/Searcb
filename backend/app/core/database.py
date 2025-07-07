@@ -2,6 +2,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.exc import SQLAlchemyError
+from pydantic import ValidationError
 import logging
 from typing import Generator
 
@@ -32,8 +34,16 @@ def get_db() -> Generator:
     db = SessionLocal()
     try:
         yield db
+    except ValidationError as e:
+        logger.warning(f"Validation error in database operation: {str(e)}")
+        db.rollback()
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error ({type(e).__name__}): {str(e)}", exc_info=True)
+        db.rollback()
+        raise
     except Exception as e:
-        logger.error(f"Database error: {e}")
+        logger.error(f"Unexpected error in database operation: {type(e).__name__}: {str(e)}", exc_info=True)
         db.rollback()
         raise
     finally:
