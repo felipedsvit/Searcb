@@ -1,0 +1,249 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-searcb_db}
+      POSTGRES_USER: ${DB_USER:-searcb}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - searcb-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-searcb} -d ${DB_NAME:-searcb_db}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - searcb-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Main Application
+  app:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-searcb}:${DB_PASSWORD}@db:5432/${DB_NAME:-searcb_db}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - PNCP_API_URL=${PNCP_API_URL:-https://api.gov.br/pncp/v1}
+      - PNCP_TOKEN=${PNCP_TOKEN}
+      - ENVIRONMENT=production
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENTRY_DSN=${SENTRY_DSN}
+    networks:
+      - searcb-network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Celery Worker - High Priority
+  celery-high:
+    build: .
+    command: celery -A app.tasks.sync_tasks worker --loglevel=info --concurrency=2 --queues=high_priority
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-searcb}:${DB_PASSWORD}@db:5432/${DB_NAME:-searcb_db}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - PNCP_API_URL=${PNCP_API_URL:-https://api.gov.br/pncp/v1}
+      - PNCP_TOKEN=${PNCP_TOKEN}
+      - ENVIRONMENT=production
+    networks:
+      - searcb-network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Celery Worker - Normal Priority
+  celery-normal:
+    build: .
+    command: celery -A app.tasks.sync_tasks worker --loglevel=info --concurrency=4 --queues=normal_priority
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-searcb}:${DB_PASSWORD}@db:5432/${DB_NAME:-searcb_db}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - PNCP_API_URL=${PNCP_API_URL:-https://api.gov.br/pncp/v1}
+      - PNCP_TOKEN=${PNCP_TOKEN}
+      - ENVIRONMENT=production
+    networks:
+      - searcb-network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Celery Beat Scheduler
+  celery-beat:
+    build: .
+    command: celery -A app.tasks.sync_tasks beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-searcb}:${DB_PASSWORD}@db:5432/${DB_NAME:-searcb_db}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - PNCP_API_URL=${PNCP_API_URL:-https://api.gov.br/pncp/v1}
+      - PNCP_TOKEN=${PNCP_TOKEN}
+      - ENVIRONMENT=production
+    networks:
+      - searcb-network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-prod.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+      - ./logs:/var/log/nginx
+    networks:
+      - searcb-network
+    depends_on:
+      - app
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Backup Service
+  backup:
+    image: postgres:15-alpine
+    environment:
+      - PGPASSWORD=${DB_PASSWORD}
+    volumes:
+      - ./backups:/backups
+      - ./backup-script.sh:/backup-script.sh
+    networks:
+      - searcb-network
+    depends_on:
+      - db
+    command: |
+      sh -c "
+        while true; do
+          sleep 86400  # 24 hours
+          /backup-script.sh
+        done
+      "
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  searcb-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16

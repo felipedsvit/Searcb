@@ -1,0 +1,422 @@
+Claro. Com base nos exemplos de cURL que você forneceu, aqui está uma análise abrangente dos endpoints da API pública do PNCP utilizados pelo aplicativo nRadar.
+
+É importante observar que as informações relativas ao repositório GitHub nLic nas referências não continham detalhes sobre esses endpoints da API1. Portanto, toda esta análise é baseada nos cinco exemplos de cURL do seu pedido.
+
+Embora os exemplos definam as requisições, o formato dos dados de resposta (nomes dos campos, tipos de dados, etc.) não foi incluído. Forneci uma estrutura provável para as respostas com base no contexto de cada endpoint, mas esta é uma informação complementar proveniente dos meus dados de treinamento.
+
+Endpoints da API Pública do PNCP Utilizados pelo nRadar
+
+Aqui estão as especificações detalhadas para cada endpoint da API identificado a partir dos seus exemplos.
+
+1. Consultar Contratações com Período de Propostas em Aberto
+Este endpoint é usado para encontrar oportunidades de contratação que estão atualmente aceitando propostas.
+
+Finalidade: Consultar oportunidades de contratação que estão dentro do seu período ativo de licitação.
+Método HTTP: GET
+URL do Endpoint: https://pncp.gov.br/api/consulta/v1/contratacoes/proposta
+Parâmetros de Consulta: | Parâmetro | Tipo de Dado | Descrição | Obrigatório/Opcional | | :--- | :--- | :--- | :--- | | dataFinal | String | A data final para o período de submissão de propostas, no formato AAAAMMDD. | Obrigatório | | codigoModalidadeContratacao | Integer | O código numérico para a modalidade de contratação (ex: 8 para um tipo específico). | Opcional | | pagina | Integer | O número da página para resultados paginados. | Opcional |
+Cabeçalhos: accept: */*
+Exemplo de Requisição (cURL):
+
+curl -k -X 'GET' \
+"https://pncp.gov.br/api/consulta/v1/contratacoes/proposta?dataFinal=20230831&codigoModalidadeContratacao=8&pagina=1" \
+-H "accept: */*"
+Formato de Resposta Esperado (Exemplo): A API provavelmente retornaria um objeto JSON contendo uma lista de contratações.
+
+{
+  "data": [
+    {
+      "id": 12345,
+      "ano": 2023,
+      "numero": "90001/2023",
+      "objeto": "Contratação de serviços de limpeza...",
+      "dataAberturaProposta": "2023-08-20T10:00:00",
+      "dataEncerramentoProposta": "2023-08-31T17:00:00",
+      "orgao": "Ministério da Gestão e da Inovação"
+    }
+  ],
+  "pagina": 1,
+  "totalPaginas": 10
+}
+2. Consultar Contratações por Data de Publicação
+Este endpoint permite uma ampla pesquisa de contratações com base em quando foram publicadas, com vários filtros para refinar os resultados.
+
+Finalidade: Consultar oportunidades de contratação com base em sua data de publicação, com filtros para localização, entidade e mais.
+Método HTTP: GET
+URL do Endpoint: https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao
+Parâmetros de Consulta: | Parâmetro | Tipo de Dado | Descrição | Obrigatório/Opcional | | :--- | :--- | :--- | :--- | | dataInicial | String | Data inicial do período de publicação (AAAAMMDD). | Obrigatório | | dataFinal | String | Data final do período de publicação (AAAAMMDD). | Obrigatório | | codigoModalidadeContratacao| Integer | Código numérico para a modalidade de contratação. | Opcional | | uf | String | Código de duas letras do estado (ex: DF). | Opcional | | codigoMunicipiolbge | Integer | Código IBGE para o município (ex: 5300108 para Brasília). | Opcional | | cnpj | String | O CNPJ da entidade contratante. | Opcional | | codigoUnidadeAdministrativa| Integer | Código para a unidade administrativa específica. | Opcional | | idUsuario | Integer | ID do usuário associado à consulta. | Opcional | | pagina | Integer | O número da página para resultados paginados. | Opcional |
+Cabeçalhos: accept: */*
+Exemplo de Requisição (cURL):
+
+curl -X 'GET' \
+'https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20230801&dataFinal=20230802&codigoModalidadeContratacao=8&uf=DF&codigoMunicipiolbge=5300108&cnpj=00059311000126&codigoUnidadeAdministrativa=194035&idUsuario=3&pagina=1' \
+-H 'accept: */*'
+3. Consultar Itens de PCA por Ano, idUsuario e Classificação Superior
+Este endpoint recupera itens do Plano Anual de Contratações (PCA) de uma entidade.
+
+Finalidade: Consultar itens específicos dentro de um Plano Anual de Contratações com base no ano, usuário e classificação.
+Método HTTP: GET
+URL do Endpoint: https://pncp.gov.br/api/consulta/v1/pca/usuario
+Parâmetros de Consulta: | Parâmetro | Tipo de Dado | Descrição | Obrigatório/Opcional | | :--- | :--- | :--- | :--- | | anoPca | Integer | O ano do Plano Anual de Contratações (ex: 2023). | Obrigatório | | idUsuario | Integer | O ID do usuário que faz a solicitação. | Obrigatório | | codigoClassificacaoSuperior | Integer | O código para uma classificação superior de itens. | Opcional | | pagina | Integer | O número da página para resultados paginados. | Opcional |
+Cabeçalhos: accept: */*
+Exemplo de Requisição (cURL):
+
+curl -X 'GET' \
+'https://pncp.gov.br/api/consulta/v1/pca/usuario?anoPca=2023&idUsuario=3&codigoClassificacaoSuperior=979&pagina=1' \
+-H 'accept: */*'
+4. Consultar Atas de Registro de Preço por Período de Vigência
+Este endpoint consulta por Atas de Registro de Preço que estão ativas dentro de um determinado intervalo de datas.
+
+Finalidade: Encontrar Atas de Registro de Preço com base em seu período de vigência.
+Método HTTP: GET
+URL do Endpoint: https://pncp.gov.br/api/consulta/v1/atas
+Parâmetros de Consulta: | Parâmetro | Tipo de Dado | Descrição | Obrigatório/Opcional | | :--- | :--- | :--- | :--- | | dataInicial | String | Data inicial do período de vigência (AAAAMMDD). | Obrigatório | | dataFinal | String | Data final do período de vigência (AAAAMMDD). | Obrigatório | | pagina | Integer | O número da página para resultados paginados. | Opcional |
+Cabeçalhos: accept: */*
+Exemplo de Requisição (cURL):
+
+curl -X 'GET' \
+'https://pncp.gov.br/api/consulta/v1/atas?dataInicial=20230701&dataFinal=20230831&pagina=1' \
+-H 'accept: */*'
+5. Consultar Contratos por Data de Publicação
+Este endpoint recupera contratos finalizados publicados dentro de um intervalo específico de datas.
+
+Finalidade: Consultar contratos assinados com base em quando foram publicados.
+Método HTTP: GET
+URL do Endpoint: https://pncp.gov.br/api/consulta/v1/contratos
+Parâmetros de Consulta: | Parâmetro | Tipo de Dado | Descrição | Obrigatório/Opcional | | :--- | :--- | :--- | :--- | | dataInicial | String | Data inicial do período de publicação (AAAAMMDD). | Obrigatório | | dataFinal | String | Data final do período de publicação (AAAAMMDD). | Obrigatório | | pagina | Integer | O número da página para resultados paginados. | Opcional |
+Cabeçalhos: accept: */*
+Exemplo de Requisição (cURL):
+
+curl -k -X GET "https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=20230801&dataFinal=20230831&pagina=1" \
+-H "accept: */*"
+
+
+---
+Com base nos endpoints da API PNCP identificados anteriormente, aqui estão os formatos de resposta JSON esperados para cada endpoint. Note que as informações sobre o repositório nLic nas referências não continham detalhes específicos sobre os formatos de resposta da API1, portanto, estas estruturas são baseadas em conhecimento complementar sobre APIs de contratações públicas e padrões comuns de resposta.
+
+Formatos de Resposta JSON - API PNCP
+
+1. Contratações com Período de Propostas em Aberto
+
+Endpoint: GET /api/consulta/v1/contratacoes/proposta
+
+
+{
+  "data": [
+    {
+      "sequencialContratacao": 12345,
+      "anoContratacao": 2023,
+      "numeroContratacao": "90001/2023",
+      "numeroProcesso": "23001.000001/2023-11",
+      "objetoContratacao": "Contratação de empresa especializada em serviços de limpeza e conservação predial",
+      "situacaoContratacao": "Publicada",
+      "modalidadeContratacao": {
+        "codigo": 8,
+        "nome": "Pregão Eletrônico"
+      },
+      "orgaoEntidade": {
+        "cnpj": "00394460000187",
+        "razaoSocial": "Ministério da Gestão e da Inovação em Serviços Públicos",
+        "poderId": 1,
+        "esferaId": 1
+      },
+      "unidadeCompradora": {
+        "codigo": 194035,
+        "nome": "Secretaria de Gestão e Desempenho de Pessoal"
+      },
+      "dataPublicacaoContratacao": "2023-08-15T09:00:00",
+      "dataAberturaProposta": "2023-08-20T10:00:00",
+      "dataEncerramentoProposta": "2023-08-31T17:00:00",
+      "valorEstimadoContratacao": 150000.00,
+      "linkSistemaOrigem": "https://pncp.gov.br/app/editais/90001-2023"
+    }
+  ],
+  "links": {
+    "self": "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta?dataFinal=20230831&pagina=1",
+    "first": "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta?dataFinal=20230831&pagina=1",
+    "prev": null,
+    "next": "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta?dataFinal=20230831&pagina=2",
+    "last": "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta?dataFinal=20230831&pagina=25"
+  },
+  "meta": {
+    "totalRegistros": 500,
+    "registrosPorPagina": 20,
+    "paginaAtual": 1,
+    "totalPaginas": 25
+  }
+}
+2. Contratações por Data de Publicação
+
+Endpoint: GET /api/consulta/v1/contratacoes/publicacao
+
+
+{
+  "data": [
+    {
+      "sequencialContratacao": 67890,
+      "anoContratacao": 2023,
+      "numeroContratacao": "90002/2023",
+      "numeroProcesso": "23001.000002/2023-44",
+      "objetoContratacao": "Aquisição de equipamentos de informática para modernização do parque tecnológico",
+      "situacaoContratacao": "Em andamento",
+      "modalidadeContratacao": {
+        "codigo": 8,
+        "nome": "Pregão Eletrônico"
+      },
+      "orgaoEntidade": {
+        "cnpj": "00394460000187",
+        "razaoSocial": "Ministério da Gestão e da Inovação em Serviços Públicos",
+        "poderId": 1,
+        "esferaId": 1,
+        "uf": "DF",
+        "municipio": {
+          "codigo": 5300108,
+          "nome": "Brasília"
+        }
+      },
+      "unidadeCompradora": {
+        "codigo": 194035,
+        "nome": "Secretaria de Gestão e Desempenho de Pessoal"
+      },
+      "dataPublicacaoContratacao": "2023-08-01T14:30:00",
+      "dataAberturaProposta": "2023-08-15T09:00:00",
+      "dataEncerramentoProposta": "2023-08-30T18:00:00",
+      "valorEstimadoContratacao": 2500000.00,
+      "linkSistemaOrigem": "https://pncp.gov.br/app/editais/90002-2023",
+      "itensContratacao": [
+        {
+          "numeroItem": 1,
+          "descricaoItem": "Notebook Dell Inspiron 15 3000",
+          "quantidade": 50,
+          "unidadeMedida": "Unidade",
+          "valorUnitarioEstimado": 2500.00
+        }
+      ]
+    }
+  ],
+  "links": {
+    "self": "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20230801&dataFinal=20230802&pagina=1",
+    "first": "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20230801&dataFinal=20230802&pagina=1",
+    "prev": null,
+    "next": "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20230801&dataFinal=20230802&pagina=2",
+    "last": "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20230801&dataFinal=20230802&pagina=15"
+  },
+  "meta": {
+    "totalRegistros": 300,
+    "registrosPorPagina": 20,
+    "paginaAtual": 1,
+    "totalPaginas": 15
+  }
+}
+3. Itens de PCA (Plano de Contratações Anuais)
+
+Endpoint: GET /api/consulta/v1/pca/usuario
+
+
+{
+  "data": [
+    {
+      "sequencialItemPca": 1001,
+      "anoPca": 2023,
+      "orgaoEntidade": {
+        "cnpj": "00394460000187",
+        "razaoSocial": "Ministério da Gestão e da Inovação em Serviços Públicos"
+      },
+      "unidadeCompradora": {
+        "codigo": 194035,
+        "nome": "Secretaria de Gestão e Desempenho de Pessoal"
+      },
+      "numeroItemPca": "001/2023",
+      "descricaoItemPca": "Contratação de serviços de consultoria em gestão de pessoas",
+      "classificacaoSuperior": {
+        "codigo": 979,
+        "nome": "Serviços de Consultoria"
+      },
+      "modalidadeContratacao": {
+        "codigo": 8,
+        "nome": "Pregão Eletrônico"
+      },
+      "valorEstimadoItemPca": 800000.00,
+      "dataInicialContratacao": "2023-09-01",
+      "dataFinalContratacao": "2023-12-31",
+      "situacaoItemPca": "Planejado",
+      "justificativaItemPca": "Necessidade de modernização dos processos de gestão de recursos humanos",
+      "beneficiosItemPca": "Melhoria na eficiência dos processos de RH e redução de custos operacionais"
+    }
+  ],
+  "links": {
+    "self": "https://pncp.gov.br/api/consulta/v1/pca/usuario?anoPca=2023&idUsuario=3&pagina=1",
+    "first": "https://pncp.gov.br/api/consulta/v1/pca/usuario?anoPca=2023&idUsuario=3&pagina=1",
+    "prev": null,
+    "next": "https://pncp.gov.br/api/consulta/v1/pca/usuario?anoPca=2023&idUsuario=3&pagina=2",
+    "last": "https://pncp.gov.br/api/consulta/v1/pca/usuario?anoPca=2023&idUsuario=3&pagina=8"
+  },
+  "meta": {
+    "totalRegistros": 150,
+    "registrosPorPagina": 20,
+    "paginaAtual": 1,
+    "totalPaginas": 8
+  }
+}
+4. Atas de Registro de Preço
+
+Endpoint: GET /api/consulta/v1/atas
+
+
+{
+  "data": [
+    {
+      "sequencialAta": 2001,
+      "anoAta": 2023,
+      "numeroAta": "001/2023",
+      "orgaoGerenciador": {
+        "cnpj": "00394460000187",
+        "razaoSocial": "Ministério da Gestão e da Inovação em Serviços Públicos"
+      },
+      "processoOrigemAta": "23001.000010/2023-88",
+      "objetoAta": "Registro de preços para aquisição de material de escritório",
+      "dataAssinaturaAta": "2023-07-15T10:00:00",
+      "dataInicioVigencia": "2023-07-15",
+      "dataFimVigencia": "2024-07-14",
+      "valorTotalEstimadoAta": 1200000.00,
+      "situacaoAta": "Vigente",
+      "fornecedores": [
+        {
+          "cnpj": "12345678000199",
+          "razaoSocial": "Papelaria Central Ltda",
+          "situacaoFornecedor": "Habilitado"
+        }
+      ],
+      "itensAta": [
+        {
+          "numeroItem": 1,
+          "descricaoItem": "Papel A4 - Resma 500 folhas",
+          "unidadeMedida": "Resma",
+          "quantidadeRegistrada": 1000,
+          "valorUnitarioRegistrado": 15.50,
+          "valorTotalItem": 15500.00
+        }
+      ],
+      "orgaosParticipantes": [
+        {
+          "cnpj": "00394460000187",
+          "razaoSocial": "Ministério da Gestão e da Inovação em Serviços Públicos",
+          "quantidadeEstimada": 500
+        }
+      ]
+    }
+  ],
+  "links": {
+    "self": "https://pncp.gov.br/api/consulta/v1/atas?dataInicial=20230701&dataFinal=20230831&pagina=1",
+    "first": "https://pncp.gov.br/api/consulta/v1/atas?dataInicial=20230701&dataFinal=20230831&pagina=1",
+    "prev": null,
+    "next": "https://pncp.gov.br/api/consulta/v1/atas?dataInicial=20230701&dataFinal=20230831&pagina=2",
+    "last": "https://pncp.gov.br/api/consulta/v1/atas?dataInicial=20230701&dataFinal=20230831&pagina=12"
+  },
+  "meta": {
+    "totalRegistros": 240,
+    "registrosPorPagina": 20,
+    "paginaAtual": 1,
+    "totalPaginas": 12
+  }
+}
+5. Contratos por Data de Publicação
+
+Endpoint: GET /api/consulta/v1/contratos
+
+
+{
+  "data": [
+    {
+      "sequencialContrato": 3001,
+      "anoContrato": 2023,
+      "numeroContrato": "001/2023",
+      "processoOrigemContrato": "23001.000020/2023-11",
+      "objetoContrato": "Prestação de serviços de segurança patrimonial",
+      "dataAssinaturaContrato": "2023-08-01T15:30:00",
+      "dataPublicacaoContrato": "2023-08-01T16:00:00",
+      "dataInicioVigencia": "2023-08-15",
+      "dataFimVigencia": "2024-08-14",
+      "valorInicialContrato": 600000.00,
+      "valorAtualContrato": 600000.00,
+      "situacaoContrato": "Assinado",
+      "modalidadeContratacao": {
+        "codigo": 8,
+        "nome": "Pregão Eletrônico"
+      },
+      "orgaoEntidade": {
+        "cnpj": "00394460000187",
+        "razaoSocial": "Ministério da Gestão e da Inovação em Serviços Públicos",
+        "uf": "DF",
+        "municipio": {
+          "codigo": 5300108,
+          "nome": "Brasília"
+        }
+      },
+      "unidadeCompradora": {
+        "codigo": 194035,
+        "nome": "Secretaria de Gestão e Desempenho de Pessoal"
+      },
+      "fornecedor": {
+        "cnpj": "98765432000155",
+        "razaoSocial": "Segurança Total Ltda",
+        "uf": "DF",
+        "municipio": {
+          "codigo": 5300108,
+          "nome": "Brasília"
+        }
+      },
+      "itensContrato": [
+        {
+          "numeroItem": 1,
+          "descricaoItem": "Serviços de vigilância patrimonial - 12 horas/dia",
+          "unidadeMedida": "Mês",
+          "quantidadeContratada": 12,
+          "valorUnitarioContratado": 50000.00,
+          "valorTotalItem": 600000.00
+        }
+      ],
+      "gestorContrato": {
+        "nome": "João Silva Santos",
+        "cpf": "123.456.789-00",
+        "telefone": "(61) 3333-4444",
+        "email": "joao.silva@mgi.gov.br"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=20230801&dataFinal=20230831&pagina=1",
+    "first": "https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=20230801&dataFinal=20230831&pagina=1",
+    "prev": null,
+    "next": "https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=20230801&dataFinal=20230831&pagina=2",
+    "last": "https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=20230801&dataFinal=20230831&pagina=18"
+  },
+  "meta": {
+    "totalRegistros": 350,
+    "registrosPorPagina": 20,
+    "paginaAtual": 1,
+    "totalPaginas": 18
+  }
+}
+Estrutura Comum dos Metadados
+
+Todos os endpoints seguem um padrão comum para paginação e metadados:
+
+
+{
+  "links": {
+    "self": "URL da página atual",
+    "first": "URL da primeira página",
+    "prev": "URL da página anterior (null se primeira página)",
+    "next": "URL da próxima página (null se última página)",
+    "last": "URL da última página"
+  },
+  "meta": {
+    "totalRegistros": 0,
+    "registrosPorPagina": 20,
+    "paginaAtual": 1,
+    "totalPaginas": 0
+  }
+}
+Estes formatos de resposta foram estruturados com base nos padrões comuns de APIs governamentais e no contexto específico de cada endpoint da API PNCP.
+
