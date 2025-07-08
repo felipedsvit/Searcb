@@ -1,766 +1,1045 @@
-# Sistema de Gestão Pública - Backend PNCP
+# Frontend Documentation - SEARCB
 
 ## Visão Geral
 
-Este backend implementa uma API RESTful moderna para integração e gestão de dados do Portal Nacional de Contratações Públicas (PNCP), conforme Lei nº 14.133/2021. Ele cobre Planos Anuais de Contratações (PCA), Contratações, Atas de Registro de Preços e Contratos, com autenticação JWT, paginação, cache, sincronização, validação e documentação automática.
+O frontend SEARCB é uma aplicação web moderna para gestão de contratações públicas, desenvolvida para integrar perfeitamente com o backend FastAPI do sistema. Este documento fornece um roadmap completo para desenvolvimento acelerado usando ferramentas de IA e boas práticas modernas.
 
----
+## 1. Levantamento de Requisitos e Prototipação
 
-## Autenticação e Autorização
+### 1.1. Fluxos Principais Identificados
 
-- **Modelo:** JWT Bearer Token.
-- **Fluxo:** O usuário faz login e recebe um token JWT. Todas as rotas protegidas exigem o header `Authorization: Bearer <token>`.
-- **Perfis:** admin, gestor, consulta.
-- **Endpoints:**
-  - `POST /api/v1/auth/login` — Autentica usuário e retorna token.
-  - `POST /api/v1/auth/refresh` — Renova o token.
-  - `GET /api/v1/auth/me` — Retorna dados do usuário autenticado.
+#### Fluxo de Autenticação
+- **Login/Logout**: Tela de autenticação com validação
+- **Controle de Acesso**: Redirecionamento baseado em perfis (admin, gestor, operador)
+- **Gerenciamento de Sessão**: Refresh automático de tokens e logout por inatividade
 
----
+#### Fluxo de Consulta e Listagem
+- **PCAs**: Listagem paginada com filtros por ano, órgão, status, valor
+- **Contratações**: Filtros por modalidade, situação, datas, valores
+- **Atas de Registro**: Filtros por vigência, situação, valores
+- **Contratos**: Filtros por fornecedor, vigência, valores
+- **Usuários**: Listagem administrativa com filtros por perfil e status
 
-## Endpoints REST
+#### Fluxo de Filtros Avançados
+- **Filtros Contextuais**: Filtros específicos por tipo de entidade
+- **Busca Livre**: Campo de busca unificado com sugestões
+- **Filtros Salvos**: Possibilidade de salvar combinações de filtros
+- **Exportação**: Download de resultados filtrados
 
-### 1. Planos Anuais de Contratações (PCA)
+#### Fluxo de Visualização de Detalhes
+- **Telas de Detalhe**: Visualização completa de cada entidade
+- **Histórico de Alterações**: Timeline de modificações
+- **Documentos Anexos**: Visualização e download de anexos
+- **Ações Contextuais**: Botões de ação baseados no perfil do usuário
 
-#### a) Consultar PCA por ano e usuário
+#### Fluxo de Criação e Edição
+- **Formulários Dinâmicos**: Validação em tempo real
+- **Wizard Multi-etapas**: Para entidades complexas
+- **Auto-save**: Salvamento automático de rascunhos
+- **Validação Cruzada**: Validação com dados do backend
 
-- **GET /api/v1/pca**
-- **Query Params:** `ano_pca` (int, obrigatório), `id_usuario` (int, opcional), `codigo_classificacao_superior` (str, opcional), `pagina` (int, padrão 1), `tamanho_pagina` (int, padrão 50, máx 500)
-- **Lógica:** Busca PCA localmente e/ou via PNCP, aplica filtros, paginação e retorna itens detalhados.
-- **Exemplo:**
-  ```
-  GET /api/v1/pca?ano_pca=2024&id_usuario=123&pagina=1&tamanho_pagina=50
-  Authorization: Bearer <token>
-  ```
-- **Resposta:** Lista paginada de PCAs, incluindo campos principais e itens.
+#### Fluxo de Dashboards
+- **Dashboard Executivo**: Visão geral com KPIs principais
+- **Dashboard Operacional**: Métricas detalhadas por área
+- **Dashboard Analítico**: Gráficos e tendências temporais
+- **Dashboard Personalizado**: Widgets configuráveis por usuário
 
-#### b) Consultar PCA por classificação
+#### Fluxo de Notificações
+- **Notificações em Tempo Real**: Alertas via WebSocket
+- **Central de Notificações**: Histórico de notificações
+- **Configurações**: Preferências de notificação por usuário
+- **Integração PNCP**: Notificações de atualizações externas
 
-- **GET /api/v1/pca/classificacao**
-- **Query Params:** iguais ao endpoint anterior, exceto `id_usuario` é opcional.
-- **Lógica:** Busca PCA filtrando por classificação superior.
+### 1.2. Prototipação com IA
 
----
+#### Prompts para Ferramentas de Design AI
 
-### 2. Contratações
-
-#### a) Consultar contratações por período, modalidade e filtros
-
-- **GET /api/v1/contratacoes**
-- **Query Params:** `data_inicial` (YYYY-MM-DD, obrigatório), `data_final` (YYYY-MM-DD, obrigatório), `codigo_modalidade_contratacao` (int, opcional), `codigo_modo_disputa` (int, opcional), `uf` (str, opcional), `codigo_municipio_ibge` (str, opcional), `cnpj` (str, opcional), `codigo_unidade_administrativa` (str, opcional), `id_usuario` (int, opcional), `pagina` (int, padrão 1), `tamanho_pagina` (int, padrão 50, máx 500)
-- **Lógica:** Consulta banco local e/ou PNCP, aplica filtros, paginação e retorna contratações detalhadas.
-- **Exemplo:**
-  ```
-  GET /api/v1/contratacoes?data_inicial=2024-01-01&data_final=2024-01-31&codigo_modalidade_contratacao=6
-  Authorization: Bearer <token>
-  ```
-- **Resposta:** Lista paginada de contratações, incluindo campos como número de controle PNCP, CNPJ, modalidade, situação, objeto, datas, etc.
-
-#### b) Consultar contratações com propostas em aberto
-
-- **GET /api/v1/contratacoes/propostas-abertas**
-- **Query Params:** semelhantes ao endpoint anterior, mas exige `data_final`.
-- **Lógica:** Retorna contratações com propostas abertas no período.
-
----
-
-### 3. Atas de Registro de Preços
-
-#### a) Consultar atas por vigência
-
-- **GET /api/v1/atas**
-- **Query Params:** `data_inicial` (YYYY-MM-DD, obrigatório), `data_final` (YYYY-MM-DD, obrigatório), `id_usuario`, `cnpj`, `codigo_unidade_administrativa`, `pagina`, `tamanho_pagina` (opcionais)
-- **Lógica:** Busca atas locais e/ou PNCP, filtra por vigência, pagina e retorna detalhes.
-
----
-
-### 4. Contratos
-
-#### a) Consultar contratos por publicação
-
-- **GET /api/v1/contratos**
-- **Query Params:** `data_inicial` (YYYY-MM-DD, obrigatório), `data_final` (YYYY-MM-DD, obrigatório), `cnpj_orgao`, `codigo_unidade_administrativa`, `usuario_id`, `pagina`, `tamanho_pagina` (opcionais)
-- **Lógica:** Busca contratos locais e/ou PNCP, filtra por publicação, pagina e retorna detalhes.
-
----
-
-### 5. Tabelas de Domínio
-
-#### a) Modalidades de contratação
-
-- **GET /api/v1/domain/modalidades**
-- **Lógica:** Retorna dicionário `{codigo: nome}` das modalidades, com cache.
-
-#### b) Situações de contratação
-
-- **GET /api/v1/domain/situacoes**
-- **Lógica:** Retorna dicionário `{codigo: nome}` das situações.
-
-#### c) Usuários integrados
-
-- **GET /api/v1/domain/usuarios**
-- **Lógica:** Lista usuários/sistemas integrados ao PNCP.
-
----
-
-### 6. Webhooks (Opcional, se PNCP suportar)
-
-- **POST /api/v1/pncp-webhooks/notifications**
-- **Headers:** `x-pncp-signature` (assinatura HMAC)
-- **Body:** JSON com notificação.
-- **Lógica:** Valida assinatura, enfileira processamento assíncrono.
-
----
-
-## Lógicas Internas e Estratégias
-
-- **Validação:** Todos os dados recebidos e enviados são validados por schemas Pydantic. Códigos de domínio são checados contra tabelas locais/cache.
-- **Cache:** Redis para tabelas de domínio e resultados frequentes.
-- **Sincronização:** Celery + agendamento para sincronizar dados do PNCP periodicamente.
-- **Rate Limiting:** Limita requisições por usuário/IP para evitar abuso.
-- **Monitoramento:** Logging estruturado (structlog), métricas Prometheus/Grafana.
-- **Documentação:** Swagger/OpenAPI gerado automaticamente em `/docs`.
-
----
-
-## Exemplos de Chamadas HTTP
-
-```http
-# Login
-POST /api/v1/auth/login
-Content-Type: application/json
-
-{
-  "username": "admin",
-  "password": "senha"
-}
-
-# Buscar PCA
-GET /api/v1/pca?ano_pca=2024&pagina=1&tamanho_pagina=50
-Authorization: Bearer <token>
-
-# Buscar Contratações
-GET /api/v1/contratacoes?data_inicial=2024-01-01&data_final=2024-01-31&codigo_modalidade_contratacao=6
-Authorization: Bearer <token>
-
-# Buscar Modalidades
-GET /api/v1/domain/modalidades
-Authorization: Bearer <token>
+**Para Figma AI:**
+```
+Crie um dashboard executivo para sistema de contratações públicas com:
+- Header com logo, menu de navegação e perfil do usuário
+- 4 cards de KPIs: Total de Contratos, Valor Total, Contratos Vencendo, Novos PCAs
+- Gráfico de barras mostrando contratações por modalidade
+- Lista de últimas atividades
+- Filtro de período no canto superior direito
+- Layout responsivo com sidebar colapsível
 ```
 
----
+**Para Uizard:**
+```
+Desenhe uma tela de listagem de contratos com:
+- Barra de filtros avançados (data, valor, órgão, situação)
+- Tabela paginada com colunas: número, órgão, fornecedor, valor, situação, ações
+- Botões de ação: visualizar, editar, excluir
+- Controles de paginação e tamanho de página
+- Botão de exportar resultados
+- Design moderno e limpo
+```
 
-## Observações Finais
+#### Validação com Usuários-Chave
 
-- Todos os endpoints retornam erros padronizados (400, 401, 403, 404, 422, 500) com mensagens claras.
-- Os códigos das tabelas de domínio seguem o manual do PNCP e são atualizados periodicamente.
-- O backend está preparado para expansão futura (webhooks, novos domínios, integrações).
+**Personas Identificadas:**
+- **Administrador**: Precisa de visão completa e controles administrativos
+- **Gestor**: Foco em análises e aprovações
+- **Operador**: Interface simplificada para operações do dia a dia
 
----
-        for k, v in sorted(kwargs.items()):
-            key_parts.append(f"{k}:{v}")
-        return ":".join(key_parts)
+**Método de Validação:**
+- Protótipos interativos no Figma
+- Sessões de feedback de 30 minutos
+- Testes de usabilidade com tarefas específicas
+- Iteração baseada em feedback coletado
 
-cache = CacheService()
-Modelos de Dados
+## 2. Stack Tecnológica Recomendada
 
-Modelo Base
+### 2.1. Framework Principal
 
+**React com TypeScript** (Recomendado)
+```bash
+# Setup com Vite
+npm create vite@latest searcb-frontend -- --template react-ts
+cd searcb-frontend
+npm install
+```
 
-# app/models/base.py
-from sqlalchemy import Column, Integer, DateTime, func
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
+**Justificativa:**
+- Ecossistema maduro e suporte da comunidade
+- TypeScript para maior segurança de tipos
+- Integração perfeita com ferramentas de IA
+- Performance otimizada com Vite
 
-Base = declarative_base()
+### 2.2. Gerenciamento de Estado
 
-class BaseModel(Base):
-    __abstract__ = True
-    
-    id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
-    def to_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-Modelo PCA
+**Zustand** (Recomendado para simplicidade)
+```bash
+npm install zustand
+```
 
+**Redux Toolkit** (Para projetos mais complexos)
+```bash
+npm install @reduxjs/toolkit react-redux
+```
 
-# app/models/pca.py
-from sqlalchemy import Column, String, Integer, Decimal, Date, Text, ForeignKey
-from sqlalchemy.orm import relationship
-from .base import BaseModel
+### 2.3. UI Kit e Componentes
 
-class PCA(BaseModel):
-    __tablename__ = "pca"
-    
-    # Identificação
-    id_pca_pncp = Column(String(50), unique=True, index=True)
-    ano_pca = Column(Integer, index=True)
-    data_publicacao_pncp = Column(Date)
-    
-    # Órgão/Entidade
-    orgao_entidade_cnpj = Column(String(14), index=True)
-    orgao_entidade_razao_social = Column(String(255))
-    codigo_unidade = Column(String(20))
-    nome_unidade = Column(String(255))
-    
-    # Relacionamentos
-    itens = relationship("ItemPCA", back_populates="pca")
+**Material UI** (Recomendado)
+```bash
+npm install @mui/material @emotion/react @emotion/styled
+npm install @mui/icons-material
+npm install @mui/x-data-grid @mui/x-date-pickers
+```
 
-class ItemPCA(BaseModel):
-    __tablename__ = "item_pca"
-    
-    # Relacionamento com PCA
-    pca_id = Column(Integer, ForeignKey("pca.id"))
-    pca = relationship("PCA", back_populates="itens")
-    
-    # Identificação do item
-    numero_item = Column(Integer)
-    categoria_item_pca_nome = Column(String(100))
-    classificacao_catalogo_id = Column(String(10))
-    nome_classificacao_catalogo = Column(String(50))
-    
-    # Classificação
-    classificacao_superior_codigo = Column(String(100), index=True)
-    classificacao_superior_nome = Column(String(255))
-    pdm_codigo = Column(String(100))
-    pdm_descricao = Column(String(255))
-    
-    # Descrição do item
-    codigo_item = Column(String(100))
-    descricao_item = Column(Text)
-    unidade_fornecimento = Column(String(20))
-    
-    # Valores
-    quantidade_estimada = Column(Decimal(15, 4))
-    valor_unitario = Column(Decimal(15, 4))
-    valor_total = Column(Decimal(15, 4))
-    valor_orcamento_exercicio = Column(Decimal(15, 4))
-    
-    # Datas e informações complementares
-    data_desejada = Column(Date)
-    unidade_requisitante = Column(String(255))
-    grupo_contratacao_codigo = Column(String(50))
-    grupo_contratacao_nome = Column(String(255))
-    data_inclusao = Column(Date)
-    data_atualizacao = Column(Date)
-Modelo Contratação
+**Justificativa:**
+- Componentes prontos para tabelas complexas
+- Sistema de temas robusto
+- Acessibilidade built-in
+- Data Grid profissional
 
+### 2.4. Comunicação com Backend
 
-# app/models/contratacao.py
-from sqlalchemy import Column, String, Integer, Decimal, Date, DateTime, Text, Boolean
-from sqlalchemy.orm import relationship
-from .base import BaseModel
+**React Query + Axios**
+```bash
+npm install @tanstack/react-query axios
+npm install @tanstack/react-query-devtools
+```
 
-class Contratacao(BaseModel):
-    __tablename__ = "contratacao"
-    
-    # Identificação
-    numero_controle_pncp = Column(String(50), unique=True, index=True)
-    numero_compra = Column(String(50))
-    ano_compra = Column(Integer, index=True)
-    processo = Column(String(50))
-    
-    # Instrumento e modalidade
-    tipo_instrumento_convocatorio_id = Column(Integer)
-    tipo_instrumento_convocatorio_nome = Column(String(100))
-    modalidade_id = Column(Integer, index=True)
-    modalidade_nome = Column(String(100))
-    modo_disputa_id = Column(Integer)
-    modo_disputa_nome = Column(String(100))
-    
-    # Situação
-    situacao_compra_id = Column(Integer, index=True)
-    situacao_compra_nome = Column(String(100))
-    
-    # Objeto
-    objeto_compra = Column(Text)
-    informacao_complementar = Column(Text)
-    srp = Column(Boolean, default=False)
-    
-    # Amparo legal
-    amparo_legal_codigo = Column(Integer)
-    amparo_legal_nome = Column(String(255))
-    amparo_legal_descricao = Column(Text)
-    
-    # Valores
-    valor_total_estimado = Column(Decimal(15, 4))
-    valor_total_homologado = Column(Decimal(15, 4))
-    
-    # Datas
-    data_abertura_proposta = Column(DateTime)
-    data_encerramento_proposta = Column(DateTime, index=True)
-    data_publicacao_pncp = Column(Date, index=True)
-    data_inclusao = Column(Date)
-    data_atualizacao = Column(Date)
-    
-    # Controle
-    sequencial_compra = Column(Integer)
-    
-    # Órgão/Entidade
-    orgao_entidade_cnpj = Column(String(14), index=True)
-    orgao_entidade_razao_social = Column(String(255))
-    orgao_entidade_poder_id = Column(String(1))
-    orgao_entidade_esfera_id = Column(String(1))
-    
-    # Unidade do órgão
-    unidade_orgao_codigo = Column(String(20))
-    unidade_orgao_nome = Column(String(255))
-    unidade_orgao_codigo_ibge = Column(Integer)
-    unidade_orgao_municipio = Column(String(100))
-    unidade_orgao_uf_sigla = Column(String(2), index=True)
-    unidade_orgao_uf_nome = Column(String(50))
-    
-    # Órgão subrogado (opcional)
-    orgao_subrogado_cnpj = Column(String(14))
-    orgao_subrogado_razao_social = Column(String(255))
-    orgao_subrogado_poder_id = Column(String(1))
-    orgao_subrogado_esfera_id = Column(String(1))
-    
-    # Unidade subrogada (opcional)
-    unidade_subrogada_codigo = Column(String(20))
-    unidade_subrogada_nome = Column(String(255))
-    unidade_subrogada_codigo_ibge = Column(Integer)
-    unidade_subrogada_municipio = Column(String(100))
-    unidade_subrogada_uf_sigla = Column(String(2))
-    unidade_subrogada_uf_nome = Column(String(50))
-    
-    # Sistema
-    usuario_nome = Column(String(255))
-    link_sistema_origem = Column(String(500))
-    justificativa_presencial = Column(Text)
-    
-    # Relacionamentos
-    itens = relationship("ItemContratacao", back_populates="contratacao")
+### 2.5. Autenticação e Roteamento
 
-class ItemContratacao(BaseModel):
-    __tablename__ = "item_contratacao"
-    
-    # Relacionamento
-    contratacao_id = Column(Integer, ForeignKey("contratacao.id"))
-    contratacao = relationship("Contratacao", back_populates="itens")
-    
-    # Identificação
-    numero_item = Column(Integer)
-    descricao_item = Column(Text)
-    unidade_medida = Column(String(20))
-    quantidade = Column(Decimal(15, 4))
-    valor_unitario = Column(Decimal(15, 4))
-    valor_total = Column(Decimal(15, 4))
-    
-    # Situação
-    situacao_item_id = Column(Integer)
-    situacao_item_nome = Column(String(100))
-    
-    # Benefícios
-    tipo_beneficio_id = Column(Integer)
-    tipo_beneficio_nome = Column(String(100))
-Modelo Ata de Registro de Preços
+```bash
+npm install react-router-dom
+npm install @types/react-router-dom
+```
 
+### 2.6. Validação e Formulários
 
-# app/models/ata.py
-from sqlalchemy import Column, String, Integer, Date, Boolean, Text, ForeignKey
-from sqlalchemy.orm import relationship
-from .base import BaseModel
+```bash
+npm install react-hook-form @hookform/resolvers zod
+```
 
-class AtaRegistroPreco(BaseModel):
-    __tablename__ = "ata_registro_preco"
-    
-    # Identificação
-    numero_controle_pncp_ata = Column(String(50), unique=True, index=True)
-    numero_controle_pncp_compra = Column(String(50), index=True)
-    numero_ata_registro_preco = Column(String(50))
-    ano_ata = Column(Integer, index=True)
-    
-    # Datas
-    data_assinatura = Column(Date)
-    vigencia_inicio = Column(Date, index=True)
-    vigencia_fim = Column(Date, index=True)
-    data_cancelamento = Column(Date)
-    cancelado = Column(Boolean, default=False)
-    data_publicacao_pncp = Column(Date)
-    data_inclusao = Column(Date)
-    data_atualizacao = Column(Date)
-    
-    # Objeto
-    objeto_contratacao = Column(Text)
-    
-    # Órgão
-    cnpj_orgao = Column(String(14), index=True)
-    nome_orgao = Column(String(255))
-    codigo_unidade_orgao = Column(String(20))
-    nome_unidade_orgao = Column(String(255))
-    
-    # Órgão subrogado (opcional)
-    cnpj_orgao_subrogado = Column(String(14))
-    nome_orgao_subrogado = Column(String(255))
-    codigo_unidade_orgao_subrogado = Column(String(20))
-    nome_unidade_orgao_subrogado = Column(String(255))
-    
-    # Sistema
-    usuario = Column(String(255))
-Modelo Contrato
+### 2.7. Gráficos e Visualizações
 
+```bash
+npm install recharts
+npm install @mui/x-charts
+```
 
-# app/models/contrato.py
-from sqlalchemy import Column, String, Integer, Decimal, Date, DateTime, Text, Boolean
-from .base import BaseModel
+### 2.8. Testes
 
-class Contrato(BaseModel):
-    __tablename__ = "contrato"
-    
-    # Identificação
-    numero_controle_pncp = Column(String(50), unique=True, index=True)
-    numero_controle_pncp_compra = Column(String(50), index=True)
-    numero_contrato_empenho = Column(String(50))
-    ano_contrato = Column(Integer, index=True)
-    sequencial_contrato = Column(Integer)
-    processo = Column(String(50))
-    
-    # Tipo e categoria
-    tipo_contrato_id = Column(Integer)
-    tipo_contrato_nome = Column(String(100))
-    categoria_processo_id = Column(Integer)
-    categoria_processo_nome = Column(String(100))
-    
-    # Natureza
-    receita = Column(Boolean, default=False)
-    
-    # Objeto
-    objeto_contrato = Column(Text)
-    informacao_complementar = Column(Text)
-    
-    # Órgão/Entidade
-    orgao_entidade_cnpj = Column(String(14), index=True)
-    orgao_entidade_razao_social = Column(String(255))
-    orgao_entidade_poder_id = Column(String(1))
-    orgao_entidade_esfera_id = Column(String(1))
-    
-    # Unidade executora
-    unidade_orgao_codigo = Column(String(20))
-    unidade_orgao_nome = Column(String(255))
-    unidade_orgao_codigo_ibge = Column(Integer)
-    unidade_orgao_municipio = Column(String(100))
-    unidade_orgao_uf_sigla = Column(String(2))
-    unidade_orgao_uf_nome = Column(String(50))
-    
-    # Órgão subrogado
-    orgao_subrogado_cnpj = Column(String(14))
-    orgao_subrogado_razao_social = Column(String(255))
-    orgao_subrogado_poder_id = Column(String(1))
-    orgao_subrogado_esfera_id = Column(String(1))
-    
-    # Unidade subrogada
-    unidade_subrogada_codigo = Column(String(20))
-    unidade_subrogada_nome = Column(String(255))
-    unidade_subrogada_codigo_ibge = Column(Integer)
-    unidade_subrogada_municipio = Column(String(100))
-    unidade_subrogada_uf_sigla = Column(String(2))
-    unidade_subrogada_uf_nome = Column(String(50))
-    
-    # Fornecedor
-    tipo_pessoa = Column(String(2))
-    ni_fornecedor = Column(String(30))
-    nome_razao_social_fornecedor = Column(String(100))
-    
-    # Subcontratado (opcional)
-    tipo_pessoa_subcontratada = Column(String(2))
-    ni_fornecedor_subcontratado = Column(String(30))
-    nome_fornecedor_subcontratado = Column(String(100))
-    
-    # Valores
-    valor_inicial = Column(Decimal(15, 4))
-    numero_parcelas = Column(Integer)
-    valor_parcela = Column(Decimal(15, 4))
-    valor_global = Column(Decimal(15, 4))
-    valor_acumulado = Column(Decimal(15, 4))
-    
-    # Datas
-    data_assinatura = Column(Date)
-    data_vigencia_inicio = Column(Date, index=True)
-    data_vigencia_fim = Column(Date, index=True)
-    data_publicacao_pncp = Column(DateTime)
-    data_atualizacao = Column(DateTime)
-    
-    # Controle
-    numero_retificacao = Column(Integer)
-    
-    # Sistema
-    usuario_nome = Column(String(255))
-    
-    # CIPI (opcional)
-    identificador_cipi = Column(String(100))
-    url_cipi = Column(String(500))
-Constantes e Tabelas de Domínio
+```bash
+npm install --save-dev vitest @testing-library/react @testing-library/jest-dom
+npm install --save-dev @testing-library/user-event
+```
 
+### 2.9. Ferramentas de Desenvolvimento
 
-# app/utils/constants.py
-from enum import Enum
+```bash
+npm install --save-dev eslint prettier @typescript-eslint/eslint-plugin
+npm install --save-dev @storybook/react @storybook/addon-essentials
+```
 
-class InstrumentoConvocatorio(Enum):
-    EDITAL = 1
-    AVISO_CONTRATACAO_DIRETA = 2
-    ATO_AUTORIZA_CONTRATACAO_DIRETA = 3
+## 3. Integração Inteligente com Backend
 
-class ModalidadeContratacao(Enum):
-    LEILAO_ELETRONICO = 1
-    DIALOGO_COMPETITIVO = 2
-    CONCURSO = 3
-    CONCORRENCIA_ELETRONICA = 4
-    CONCORRENCIA_PRESENCIAL = 5
-    PREGAO_ELETRONICO = 6
-    PREGAO_PRESENCIAL = 7
-    DISPENSA_LICITACAO = 8
-    INEXIGIBILIDADE = 9
-    MANIFESTACAO_INTERESSE = 10
-    PRE_QUALIFICACAO = 11
-    CREDENCIAMENTO = 12
-    LEILAO_PRESENCIAL = 13
+### 3.1. Geração Automática de Cliente API
 
-class ModoDisputa(Enum):
-    ABERTO = 1
-    FECHADO = 2
-    ABERTO_FECHADO = 3
-    DISPENSA_COM_DISPUTA = 4
-    NAO_SE_APLICA = 5
-    FECHADO_ABERTO = 6
+**Usando OpenAPI Generator:**
+```bash
+# Instalar OpenAPI Generator
+npm install @openapitools/openapi-generator-cli
 
-class CriterioJulgamento(Enum):
-    MENOR_PRECO = 1
-    MAIOR_DESCONTO = 2
-    TECNICA_PRECO = 4
-    MAIOR_LANCE = 5
-    MAIOR_RETORNO_ECONOMICO = 6
-    NAO_SE_APLICA = 7
-    MELHOR_TECNICA = 8
-    CONTEUDO_ARTISTICO = 9
+# Gerar cliente TypeScript
+npx openapi-generator-cli generate \
+  -i http://localhost:8000/openapi.json \
+  -g typescript-axios \
+  -o src/api/generated
+```
 
-class SituacaoContratacao(Enum):
-    DIVULGADA_PNCP = 1
-    REVOGADA = 2
-    ANULADA = 3
-    SUSPENSA = 4
+**Configuração do Cliente API:**
+```typescript
+// src/api/client.ts
+import { Configuration, DefaultApi } from './generated';
+import { getAuthToken } from '../auth/store';
 
-class SituacaoItem(Enum):
-    EM_ANDAMENTO = 1
-    HOMOLOGADO = 2
-    ANULADO_REVOGADO_CANCELADO = 3
-    DESERTO = 4
-    FRACASSADO = 5
+const configuration = new Configuration({
+  basePath: process.env.REACT_APP_API_URL || 'http://localhost:8000',
+  accessToken: () => getAuthToken(),
+});
 
-class TipoBeneficio(Enum):
-    PARTICIPACAO_EXCLUSIVA_ME_EPP = 1
-    SUBCONTRATACAO_ME_EPP = 2
-    COTA_RESERVADA_ME_EPP = 3
-    SEM_BENEFICIO = 4
-    NAO_SE_APLICA = 5
+export const apiClient = new DefaultApi(configuration);
+```
 
-class TipoContrato(Enum):
-    CONTRATO_TERMO_INICIAL = 1
-    COMODATO = 2
-    ARRENDAMENTO = 3
-    CONCESSAO = 4
-    TERMO_ADESAO = 5
-    CONVENIO = 6
-    EMPENHO = 7
-    OUTROS = 8
-    TED = 9
-    ACT = 10
-    TERMO_COMPROMISSO = 11
-    CARTA_CONTRATO = 12
+### 3.2. Hooks Personalizados com React Query
 
-class PorteEmpresa(Enum):
-    ME = 1
-    EPP = 2
-    DEMAIS = 3
-    NAO_SE_APLICA = 4
-    NAO_INFORMADO = 5
+**Prompt para GitHub Copilot:**
+```
+Crie hooks React Query para todas as operações de PCA:
+- usePCAs (listagem com filtros)
+- usePCA (detalhes por ID)
+- useCreatePCA (mutação para criar)
+- useUpdatePCA (mutação para atualizar)
+- useDeletePCA (mutação para deletar)
+Inclua tratamento de erro e cache invalidation
+```
 
-class CategoriaProcesso(Enum):
-    CESSAO = 1
-    COMPRAS = 2
-    INFORMATICA_TIC = 3
-    INTERNACIONAL = 4
-    LOCACAO_IMOVEIS = 5
-    MAO_OBRA = 6
-    OBRAS = 7
-    SERVICOS = 8
-    SERVICOS_ENGENHARIA = 9
-    SERVICOS_SAUDE = 10
-    ALIENACAO_BENS = 11
+### 3.3. Validação com Zod
 
-class CategoriaItemPCA(Enum):
-    MATERIAL = 1
-    SERVICO = 2
-    OBRAS = 3
-    SERVICOS_ENGENHARIA = 4
-    SOLUCOES_TIC = 5
-    LOCACAO_IMOVEIS = 6
-    ALIENACAO_CONCESSAO_PERMISSAO = 7
-    OBRAS_SERVICOS_ENGENHARIA = 8
+**Schema Base:**
+```typescript
+// src/schemas/pca.ts
+import { z } from 'zod';
 
-# Mapeamento para consultas
-MODALIDADE_NAMES = {
-    1: "Leilão Eletrônico",
-    2: "Diálogo Competitivo", 
-    3: "Concurso",
-    4: "Concorrência Eletrônica",
-    5: "Concorrência Presencial",
-    6: "Pregão Eletrônico",
-    7: "Pregão Presencial",
-    8: "Dispensa de Licitação",
-    9: "Inexigibilidade",
-    10: "Manifestação de Interesse",
-    11: "Pré-qualificação",
-    12: "Credenciamento",
-    13: "Leilão Presencial"
+export const PCASchema = z.object({
+  ano: z.number().min(2020).max(2030),
+  orgao_cnpj: z.string().length(14),
+  orgao_nome: z.string().min(1),
+  numero_pca: z.string().min(1),
+  titulo: z.string().min(1),
+  descricao: z.string().optional(),
+  valor_total: z.number().positive(),
+  data_publicacao: z.string().refine((date) => !isNaN(Date.parse(date))),
+});
+
+export type PCAFormData = z.infer<typeof PCASchema>;
+```
+
+## 4. Funcionalidades Principais
+
+### 4.1. Autenticação e Controle de Acesso
+
+#### Context de Autenticação
+```typescript
+// src/auth/AuthContext.tsx
+interface AuthState {
+  user: User | null;
+  token: string | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
 }
 
-SITUACAO_CONTRATACAO_NAMES = {
-    1: "Divulgada no PNCP",
-    2: "Revogada",
-    3: "Anulada", 
-    4: "Suspensa"
+interface AuthActions {
+  login: (credentials: LoginCredentials) => Promise<void>;
+  logout: () => void;
+  refreshToken: () => Promise<void>;
 }
+```
 
-AMPARO_LEGAL_NAMES = {
-    1: "Lei 14.133/2021, Art. 28, I",
-    2: "Lei 14.133/2021, Art. 28, II",
-    3: "Lei 14.133/2021, Art. 28, III",
-    4: "Lei 14.133/2021, Art. 28, IV",
-    5: "Lei 14.133/2021, Art. 28, V",
-    6: "Lei 14.133/2021, Art. 74, I",
-    7: "Lei 14.133/2021, Art. 74, II",
-    8: "Lei 14.133/2021, Art. 74, III, a",
-    # ... demais códigos conforme tabela do PNCP
+#### Proteção de Rotas
+```typescript
+// src/components/ProtectedRoute.tsx
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRoles?: UserRole[];
+  fallback?: React.ReactNode;
 }
-Schemas Pydantic
+```
 
-Schemas Comuns
+#### Tela de Login
+**Prompt para Copilot:**
+```
+Crie um componente de login Material UI com:
+- Formulário com email e senha
+- Validação em tempo real
+- Loading state durante autenticação
+- Tratamento de erros
+- Lembrar credenciais
+- Link para recuperação de senha
+```
 
+### 4.2. Listagens e Filtros
 
-# app/schemas/common.py
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict, Any
-from datetime import date, datetime
-from decimal import Decimal
+#### Componente Base de Tabela
+```typescript
+// src/components/DataTable.tsx
+interface DataTableProps<T> {
+  data: T[];
+  columns: Column<T>[];
+  loading?: boolean;
+  pagination?: PaginationConfig;
+  filters?: FilterConfig[];
+  onRowClick?: (row: T) => void;
+  onFilter?: (filters: FilterState) => void;
+  onSort?: (sort: SortConfig) => void;
+}
+```
 
-class PaginationParams(BaseModel):
-    pagina: int = Field(1, ge=1, description="Número da página")
-    tamanho_pagina: int = Field(50, ge=1, le=500, description="Tamanho da página")
+#### Filtros Avançados
+**Prompt para Copilot:**
+```
+Crie um componente de filtros avançados reutilizável com:
+- Filtros de data (range picker)
+- Filtros de valor (min/max)
+- Filtros de seleção (dropdown)
+- Filtros de busca livre
+- Botões limpar e aplicar
+- Salvamento de filtros favoritos
+- Estado persistente na URL
+```
 
-class PaginatedResponse(BaseModel):
-    data: List[Any]
-    total_registros: int
-    total_paginas: int
-    numero_pagina: int
-    paginas_restantes: int
-    empty: bool
+### 4.3. Detalhamento e CRUD
 
-class DateRangeFilter(BaseModel):
-    data_inicial: date = Field(..., description="Data inicial no formato YYYY-MM-DD")
-    data_final: date = Field(..., description="Data final no formato YYYY-MM-DD")
+#### Tela de Detalhes Genérica
+```typescript
+// src/components/DetailView.tsx
+interface DetailViewProps<T> {
+  data: T;
+  fields: FieldConfig[];
+  actions?: ActionConfig[];
+  tabs?: TabConfig[];
+  loading?: boolean;
+}
+```
+
+#### Formulários Dinâmicos
+**Prompt para Copilot:**
+```
+Crie um sistema de formulários dinâmicos com:
+- Geração de campos baseada em schema Zod
+- Validação em tempo real
+- Auto-save de rascunhos
+- Upload de arquivos
+- Campos condicionais
+- Wizard multi-etapas
+- Preview antes de salvar
+```
+
+### 4.4. Dashboards e Relatórios
+
+#### Dashboard Executivo
+```typescript
+// src/pages/ExecutiveDashboard.tsx
+interface DashboardWidget {
+  id: string;
+  type: 'kpi' | 'chart' | 'table' | 'list';
+  title: string;
+  data: any;
+  config: WidgetConfig;
+}
+```
+
+**Prompt para Copilot:**
+```
+Crie um dashboard executivo com:
+- 4 cards de KPIs principais
+- Gráfico de barras para modalidades
+- Gráfico de linha para tendências mensais
+- Lista de contratos vencendo
+- Filtro de período
+- Widgets redimensionáveis
+- Export para PDF
+```
+
+#### Geração de Relatórios
+```typescript
+// src/services/reportService.ts
+interface ReportConfig {
+  type: 'pdf' | 'excel' | 'csv';
+  template: string;
+  data: any;
+  filters: FilterState;
+}
+```
+
+### 4.5. Notificações e Webhooks
+
+#### Sistema de Notificações
+```typescript
+// src/notifications/NotificationSystem.tsx
+interface Notification {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+  timestamp: Date;
+  read: boolean;
+  actions?: NotificationAction[];
+}
+```
+
+#### WebSocket para Tempo Real
+```typescript
+// src/services/websocketService.ts
+class WebSocketService {
+  private ws: WebSocket | null = null;
+  
+  connect(): void;
+  disconnect(): void;
+  subscribe(event: string, callback: Function): void;
+  unsubscribe(event: string, callback: Function): void;
+}
+```
+
+## 5. Uso de IA para Acelerar Desenvolvimento
+
+### 5.1. GitHub Copilot - Prompts Estratégicos
+
+#### Para Componentes
+```
+// Gerar componente completo
+Crie um componente React para exibir lista de contratos com:
+- Tabela Material UI com paginação
+- Filtros por data, valor e status
+- Ações de visualizar, editar e excluir
+- Loading states e tratamento de erro
+- TypeScript com interfaces apropriadas
+```
+
+#### Para Hooks Personalizados
+```
+// Gerar hooks React Query
+Crie hooks personalizados para gerenciar estado de contratos:
+- useContratos para listagem com filtros
+- useContrato para buscar por ID
+- useMutationContrato para CRUD operations
+- Incluir cache invalidation e optimistic updates
+```
+
+#### Para Testes
+```
+// Gerar testes unitários
+Crie testes abrangentes para o componente ContractList:
+- Testes de renderização
+- Testes de interação (filtros, paginação)
+- Testes de integração com API
+- Mock de hooks e serviços
+- Casos de edge e erro
+```
+
+### 5.2. Ferramentas de Prototipação AI
+
+#### Uizard - Prompts para Telas
+```
+Desenhe uma interface para gestão de PCAs com:
+- Sidebar com navegação principal
+- Header com busca global e notificações
+- Área principal com lista filtrada de PCAs
+- Painel lateral para detalhes do PCA selecionado
+- Botões flutuantes para ações rápidas
+- Design seguindo Material Design 3
+```
+
+#### V0.dev - Prompts para Componentes
+```
+Crie um card de estatísticas para dashboard com:
+- Ícone à esquerda
+- Título e valor principal
+- Subtítulo com variação percentual
+- Indicador visual de crescimento/queda
+- Animação suave ao carregar
+- Responsivo para mobile
+```
+
+### 5.3. IA para Documentação
+
+#### Prompt para Documentação Automática
+```
+Analise este componente React e gere:
+- Documentação JSDoc completa
+- Exemplos de uso
+- Props table para Storybook
+- Casos de teste sugeridos
+- Guia de acessibilidade
+- Performance considerations
+```
+
+### 5.4. Assistentes de QA com IA
+
+#### Code Review Automático
+```
+Revise este código React e sugira melhorias para:
+- Performance (memo, callbacks, re-renders)
+- Acessibilidade (ARIA, semântica)
+- Segurança (XSS, validação)
+- Manutenibilidade (estrutura, naming)
+- Testes (cobertura, qualidade)
+```
+
+## 6. Fluxo de Desenvolvimento
+
+### 6.1. Setup do Projeto
+
+```bash
+# 1. Criar projeto
+npm create vite@latest searcb-frontend -- --template react-ts
+
+# 2. Instalar dependências
+cd searcb-frontend
+npm install
+
+# 3. Instalar dependências adicionais
+npm install @mui/material @emotion/react @emotion/styled
+npm install @tanstack/react-query axios zustand react-router-dom
+npm install react-hook-form @hookform/resolvers zod
+npm install recharts
+```
+
+#### Configuração Inicial
+```typescript
+// src/main.tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import App from './App';
+import { theme } from './theme';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutos
+    },
+  },
+});
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <App />
+      </ThemeProvider>
+    </QueryClientProvider>
+  </React.StrictMode>
+);
+```
+
+### 6.2. Desenvolvimento por Etapas
+
+#### Etapa 1: Autenticação (Semana 1)
+- [ ] Setup do AuthContext
+- [ ] Tela de login
+- [ ] Proteção de rotas
+- [ ] Interceptors para API
+- [ ] Logout automático
+
+#### Etapa 2: Clientes API (Semana 2)
+- [ ] Geração de cliente OpenAPI
+- [ ] Configuração React Query
+- [ ] Hooks personalizados base
+- [ ] Tratamento de erros global
+- [ ] Loading states
+
+#### Etapa 3: Listagens Principais (Semana 3-4)
+- [ ] Componente DataTable base
+- [ ] Sistema de filtros
+- [ ] Paginação
+- [ ] Ordenação
+- [ ] Export de dados
+
+#### Etapa 4: CRUD Operations (Semana 5-6)
+- [ ] Formulários dinâmicos
+- [ ] Validação Zod
+- [ ] Telas de detalhes
+- [ ] Modais de confirmação
+- [ ] Feedback visual
+
+#### Etapa 5: Dashboards (Semana 7-8)
+- [ ] Dashboard executivo
+- [ ] Gráficos e KPIs
+- [ ] Widgets reutilizáveis
+- [ ] Filtros de período
+- [ ] Export de relatórios
+
+#### Etapa 6: Notificações (Semana 9)
+- [ ] Sistema de notificações
+- [ ] WebSocket integration
+- [ ] Configurações de usuário
+- [ ] Push notifications
+
+#### Etapa 7: Testes e QA (Semana 10)
+- [ ] Testes unitários
+- [ ] Testes de integração
+- [ ] Testes e2e com Playwright
+- [ ] Performance testing
+- [ ] Acessibilidade audit
+
+#### Etapa 8: Deploy e Documentação (Semana 11)
+- [ ] CI/CD pipeline
+- [ ] Storybook
+- [ ] Documentação técnica
+- [ ] Guias de usuário
+- [ ] Performance monitoring
+
+## 7. Exemplos de Prompts para Copilot/IA
+
+### 7.1. Componentes React
+
+#### Prompt: Listagem de Contratos
+```
+Crie um componente React para listar contratos com as seguintes funcionalidades:
+- Tabela Material UI responsiva
+- Filtros: data de assinatura (range), valor (min/max), situação (select), órgão (autocomplete)
+- Paginação com opções de 10, 25, 50 itens por página
+- Ordenação por colunas clicáveis
+- Ações: visualizar (ícone eye), editar (ícone edit), excluir (ícone delete)
+- Loading skeleton durante carregamento
+- Estado vazio com ilustração
+- Export para Excel/PDF
+- Busca livre no header
+- TypeScript com interfaces completas
+```
+
+#### Prompt: Formulário de PCA
+```
+Crie um formulário wizard multi-etapas para cadastro de PCA:
+Etapa 1: Dados básicos (ano, órgão, número)
+Etapa 2: Descrição e valores
+Etapa 3: Itens de contratação (lista editável)
+Etapa 4: Revisão e confirmação
+- Validação com Zod em cada etapa
+- Navegação entre etapas
+- Auto-save em localStorage
+- Indicador de progresso
+- Botões voltar/próximo/salvar
+- Confirmação antes de sair sem salvar
+```
+
+### 7.2. Hooks Personalizados
+
+#### Prompt: Hooks de Autenticação
+```
+Crie um hook useAuth que gerencia:
+- Estado do usuário logado
+- Login/logout com persistência segura
+- Refresh automático de token
+- Verificação de permissões por role
+- Redirect após login/logout
+- Loading states
+- Error handling
+- Integration com React Query
+- TypeScript com tipos seguros
+```
+
+#### Prompt: Hooks de Dados
+```
+Crie hooks React Query para gerenciar dados de contratações:
+- useContratacoes: listagem com filtros, paginação, busca
+- useContratacao: detalhes por ID com cache
+- useCreateContratacao: mutação com optimistic updates
+- useUpdateContratacao: mutação com invalidação
+- useDeleteContratacao: mutação com confirmação
+- Tratamento de erros consistente
+- Loading states padronizados
+- Cache invalidation inteligente
+```
+
+### 7.3. Dashboards e Visualizações
+
+#### Prompt: Dashboard Executivo
+```
+Crie um dashboard executivo com layout responsivo:
+- Grid de 4 KPIs: Total Contratos, Valor Contratado, Média Mensal, Economia Gerada
+- Gráfico de barras: Contratações por modalidade (últimos 12 meses)
+- Gráfico de linha: Evolução temporal de valores
+- Lista: Top 10 órgãos por valor contratado
+- Filtros: período, órgão, modalidade
+- Widgets redimensionáveis e reordenáveis
+- Export dashboard para PDF
+- Atualização automática a cada 5 minutos
+- Drill-down para detalhes
+```
+
+#### Prompt: Relatórios Analíticos
+```
+Crie um sistema de relatórios com:
+- Seleção de tipo: Executivo, Operacional, Analítico
+- Filtros dinâmicos baseados no tipo
+- Preview em tempo real
+- Geração assíncrona para relatórios grandes
+- Download em múltiplos formatos (PDF, Excel, CSV)
+- Agendamento de relatórios recorrentes
+- Histórico de relatórios gerados
+- Compartilhamento por email
+```
+
+### 7.4. Testes Automatizados
+
+#### Prompt: Testes de Componente
+```
+Crie testes abrangentes para o componente ContractList:
+- Rendering: renderização inicial, estados de loading/error/empty
+- Interaction: filtros, paginação, ordenação, busca
+- Integration: chamadas API, cache updates
+- Accessibility: navegação por teclado, screen readers
+- Performance: re-renders desnecessários
+- Edge cases: dados inválidos, network errors
+- Mocks: API responses, user interactions
+- Assertions: DOM elements, state changes, function calls
+```
+
+## 8. Boas Práticas e Padrões
+
+### 8.1. Estrutura de Projeto
+
+```
+src/
+├── api/
+│   ├── generated/          # Cliente OpenAPI gerado
+│   ├── client.ts          # Configuração do cliente
+│   └── hooks/             # React Query hooks
+├── components/
+│   ├── common/            # Componentes reutilizáveis
+│   ├── forms/             # Componentes de formulário
+│   └── ui/                # Componentes de UI base
+├── pages/
+│   ├── auth/              # Páginas de autenticação
+│   ├── dashboard/         # Dashboards
+│   └── entities/          # CRUD pages por entidade
+├── hooks/
+│   ├── useAuth.ts         # Hooks de autenticação
+│   └── useLocalStorage.ts # Hooks utilitários
+├── stores/
+│   ├── authStore.ts       # Estado de autenticação
+│   └── uiStore.ts         # Estado da UI
+├── utils/
+│   ├── constants.ts       # Constantes da aplicação
+│   ├── formatters.ts      # Formatadores de dados
+│   └── validators.ts      # Validadores customizados
+├── styles/
+│   ├── theme.ts           # Tema Material UI
+│   └── globals.css        # Estilos globais
+└── types/
+    ├── api.ts             # Tipos da API
+    └── app.ts             # Tipos da aplicação
+```
+
+### 8.2. Convenções de Nomenclatura
+
+#### Componentes
+```typescript
+// PascalCase para componentes
+const ContractList = () => {};
+const UserProfile = () => {};
+
+// Props com sufixo Props
+interface ContractListProps {
+  contracts: Contract[];
+  onSelect: (contract: Contract) => void;
+}
+```
+
+#### Hooks
+```typescript
+// Prefixo use
+const useContracts = () => {};
+const useAuth = () => {};
+const useLocalStorage = (key: string) => {};
+```
+
+#### Constantes e Enums
+```typescript
+// UPPER_SNAKE_CASE para constantes
+const API_BASE_URL = 'https://api.searcb.gov.br';
+const DEFAULT_PAGE_SIZE = 20;
+
+// PascalCase para enums
+enum ContractStatus {
+  ACTIVE = 'ACTIVE',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+}
+```
+
+### 8.3. Performance e Otimização
+
+#### Lazy Loading
+```typescript
+// Lazy loading de páginas
+const ContractListPage = lazy(() => import('./pages/contracts/ContractList'));
+const DashboardPage = lazy(() => import('./pages/dashboard/Dashboard'));
+
+// Lazy loading de componentes pesados
+const HeavyChart = lazy(() => import('./components/charts/HeavyChart'));
+```
+
+#### Memoização
+```typescript
+// Memoizar componentes caros
+const ExpensiveComponent = memo(({ data }: Props) => {
+  // Renderização custosa
+});
+
+// Memoizar callbacks
+const handleClick = useCallback((id: string) => {
+  // Handle click
+}, [dependency]);
+
+// Memoizar valores computados
+const processedData = useMemo(() => {
+  return heavyProcessing(rawData);
+}, [rawData]);
+```
+
+### 8.4. Tratamento de Erros
+
+#### Error Boundary
+```typescript
+// Componente Error Boundary
+class ErrorBoundary extends Component {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+    // Log para serviço de monitoramento
+  }
+}
+```
+
+#### Hook para Tratamento de Erros
+```typescript
+const useErrorHandler = () => {
+  return useCallback((error: Error, context?: string) => {
+    console.error(`Error in ${context}:`, error);
     
-    @validator('data_final')
-    def validate_date_range(cls, v, values):
-        if 'data_inicial' in values and v < values['data_inicial']:
-            raise ValueError('Data final deve ser maior que data inicial')
-        return v
-
-class OrgaoEntidade(BaseModel):
-    cnpj: str = Field(..., max_length=14, description="CNPJ do órgão")
-    razao_social: str = Field(..., max_length=255, description="Razão social")
-    poder_id: Optional[str] = Field(None, max_length=1, description="L/E/J")
-    esfera_id: Optional[str] = Field(None, max_length=1, description="F/E/M/D")
-
-class UnidadeOrgao(BaseModel):
-    codigo_unidade: str = Field(..., max_length=20, description="Código da unidade")
-    nome_unidade: str = Field(..., max_length=255, description="Nome da unidade")
-    codigo_ibge: Optional[int] = Field(None, description="Código IBGE município")
-    municipio_nome: Optional[str] = Field(None, max_length=100, description="Nome município")
-    uf_sigla: Optional[str] = Field(None, max_length=2, description="UF")
-    uf_nome: Optional[str] = Field(None, max_length=50, description="Nome UF")
-
-class AmparoLegal(BaseModel):
-    codigo: int = Field(..., description="Código do amparo legal")
-    nome: str = Field(..., max_length=255, description="Nome do amparo legal")
-    descricao: Optional[str] = Field(None, description="Descrição do amparo legal")
-Schemas PCA
-
-
-# app/schemas/pca.py
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List
-from datetime import date
-from decimal import Decimal
-from .common import PaginationParams, OrgaoEntidade, UnidadeOrgao
-
-class PCAFilters(BaseModel):
-    ano_pca: int = Field(..., ge=2000, le=2050, description="Ano do PCA")
-    id_usuario: Optional[int] = Field(None, description="ID do usuário/sistema")
-    codigo_classificacao_superior: Optional[str] = Field(None, max_length=100, description="Código da classificação superior")
+    // Mostrar notificação para usuário
+    toast.error(getErrorMessage(error));
     
-class ItemPCAResponse(BaseModel):
-    numero_item: int
-    categoria_item_pca_nome: str
-    classificacao_catalogo_id: str
-    nome_classificacao_catalogo: str
-    classificacao_superior_codigo: Optional[str]
-    classificacao_superior_nome: Optional[str]
-    pdm_codigo: Optional[str]
-    pdm_descricao: Optional[str]
-    codigo_item: str
-    descricao_item: str
-    unidade_fornecimento: str
-    quantidade_estim
-            raise ValueError('Data final deve ser maior que data inicial')
-        return v
+    // Log para serviço de monitoramento
+    errorTrackingService.captureException(error, { context });
+  }, []);
+};
+```
 
-class OrgaoEntidade(BaseModel):
-    cnpj: str = Field(..., max_length=14, description="CNPJ do órgão")
-    razao_social: str = Field(..., max_length=255, description="Razão social")
-    poder_id: Optional[str] = Field(None, max_length=1, description="L/E/J")
-    esfera_id: Optional[str] = Field(None, max_length=1, description="F/E/M/D")
+### 8.5. Testes e Qualidade
 
-class UnidadeOrgao(BaseModel):
-    codigo_unidade: str = Field(..., max_length=20, description="Código da unidade")
-    nome_unidade: str = Field(..., max_length=255, description="Nome da unidade")
-    codigo_ibge: Optional[int] = Field(None, description="Código IBGE município")
-    municipio_nome: Optional[str] = Field(None, max_length=100, description="Nome município")
-    uf_sigla: Optional[str] = Field(None, max_length=2, description="UF")
-    uf_nome: Optional[str] = Field(None, max_length=50, description="Nome UF")
+#### Setup de Testes
+```typescript
+// src/setupTests.ts
+import '@testing-library/jest-dom';
+import { server } from './mocks/server';
 
-class AmparoLegal(BaseModel):
-    codigo: int = Field(..., description="Código do amparo legal")
-    nome: str = Field(..., max_length=255, description="Nome do amparo legal")
-    descricao: Optional[str] = Field(None, description="Descrição do amparo legal")
-Schemas PCA
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
 
+#### Mocks MSW
+```typescript
+// src/mocks/handlers.ts
+import { rest } from 'msw';
 
-# app/schemas/pca.py
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List
-from datetime import date
-from decimal import Decimal
-from .common import PaginationParams, OrgaoEntidade, UnidadeOrgao
+export const handlers = [
+  rest.get('/api/v1/contratos', (req, res, ctx) => {
+    return res(
+      ctx.json({
+        data: mockContracts,
+        total: 100,
+        page: 1,
+        size: 20,
+      })
+    );
+  }),
+];
+```
 
-class PCAFilters(BaseModel):
-    ano_pca: int = Field(..., ge=2000, le=2050, description="Ano do PCA")
-    id_usuario: Optional[int] = Field(None, description="ID do usuário/sistema")
-    codigo_classificacao_superior: Optional[str] = Field(None, max_length=100, description="Código da classificação superior")
-    
-class ItemPCAResponse(BaseModel):
-    numero_item: int
-    categoria_item_pca_nome: str
-    classificacao_catalogo_id: str
-    nome_classificacao_catalogo: str
-    classificacao_superior_codigo: Optional[str]
-    classificacao_superior_nome: Optional[str]
-    pdm_codigo: Optional[str]
-    pdm_descricao: Optional[str]
-    codigo_item: str
-    descricao_item: str
-    unidade_fornecimento: str
-    quantidade_estim
+### 8.6. Acessibilidade
 
+#### Componentes Acessíveis
+```typescript
+// Componente com acessibilidade
+const AccessibleButton = ({ children, onClick, ...props }: Props) => (
+  <Button
+    onClick={onClick}
+    role="button"
+    aria-label={props['aria-label']}
+    tabIndex={0}
+    onKeyDown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        onClick();
+      }
+    }}
+    {...props}
+  >
+    {children}
+  </Button>
+);
+```
+
+### 8.7. Internacionalização
+
+#### Setup i18n
+```typescript
+// src/i18n/index.ts
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+
+i18n
+  .use(initReactI18next)
+  .init({
+    lng: 'pt-BR',
+    fallbackLng: 'pt-BR',
+    resources: {
+      'pt-BR': {
+        translation: require('./locales/pt-BR.json'),
+      },
+      'en': {
+        translation: require('./locales/en.json'),
+      },
+    },
+  });
+```
+
+## 9. Deploy e CI/CD
+
+### 9.1. Build e Deploy
+
+#### Dockerfile
+```dockerfile
+# Build stage
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+#### GitHub Actions
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - run: npm ci
+      - run: npm run test
+      - run: npm run lint
+      - run: npm run type-check
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - run: npm ci
+      - run: npm run build
+      - name: Deploy to Production
+        run: |
+          # Deploy steps here
+```
+
+### 9.2. Monitoramento
+
+#### Performance Monitoring
+```typescript
+// src/utils/monitoring.ts
+import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
+
+const sendToAnalytics = (metric: Metric) => {
+  // Enviar métricas para serviço de monitoramento
+  analytics.track('web-vital', {
+    name: metric.name,
+    value: metric.value,
+    rating: metric.rating,
+  });
+};
+
+// Medir Web Vitals
+getCLS(sendToAnalytics);
+getFID(sendToAnalytics);
+getFCP(sendToAnalytics);
+getLCP(sendToAnalytics);
+getTTFB(sendToAnalytics);
+```
+
+## 10. Roadmap de Desenvolvimento
+
+### Fase 1: MVP (4 semanas)
+- [ ] Autenticação básica
+- [ ] Listagens principais (PCA, Contratos)
+- [ ] CRUD básico
+- [ ] Dashboard simples
+
+### Fase 2: Funcionalidades Avançadas (4 semanas)
+- [ ] Filtros avançados
+- [ ] Relatórios
+- [ ] Notificações
+- [ ] Integração PNCP
+
+### Fase 3: Otimização e Qualidade (2 semanas)
+- [ ] Performance optimization
+- [ ] Testes abrangentes
+- [ ] Acessibilidade
+- [ ] Documentação
+
+### Fase 4: Features Premium (4 semanas)
+- [ ] Dashboards avançados
+- [ ] IA e analytics
+- [ ] Mobile app
+- [ ] Integrações externas
+
+## Contato e Suporte
+
+Para dúvidas sobre desenvolvimento frontend:
+- **Email**: dev-frontend@searcb.gov.br
+- **Slack**: #frontend-searcb
+- **Wiki**: https://wiki.searcb.gov.br/frontend
+- **Storybook**: https://storybook.searcb.gov.br
