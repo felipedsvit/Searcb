@@ -1,4 +1,3 @@
-
 services:
   # PostgreSQL Database
   db:
@@ -9,7 +8,10 @@ services:
       POSTGRES_PASSWORD: searcb_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./functions.sql:/docker-entrypoint-initdb.d/02_functions.sql
+      - ./indexes.sql:/docker-entrypoint-initdb.d/03_indexes.sql
+      - ./sample_data.sql:/docker-entrypoint-initdb.d/04_sample_data.sql
     ports:
       - "5432:5432"
     healthcheck:
@@ -18,11 +20,24 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    command: >
+      postgres
+      -c shared_preload_libraries='pg_stat_statements'
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
 
   # Redis Cache
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     ports:
@@ -48,6 +63,9 @@ services:
       - PNCP_API_URL=https://api.gov.br/pncp/v1
       - PNCP_TOKEN=your-pncp-token-here
       - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - MAX_PAGE_SIZE=500
+      - DEFAULT_PAGE_SIZE=50
     ports:
       - "8000:8000"
     depends_on:
@@ -57,6 +75,7 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
+      - ./backup:/app/backup
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -68,7 +87,7 @@ services:
   # Celery Worker
   celery:
     build: .
-    command: celery -A app.tasks.sync_tasks worker --loglevel=info --concurrency=4
+    command: celery -A app.tasks.sync_tasks worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000
     environment:
       - DATABASE_URL=postgresql://searcb:searcb_password@db:5432/searcb_db
       - REDIS_URL=redis://redis:6379/0
@@ -77,6 +96,7 @@ services:
       - SECRET_KEY=your-secret-key-change-in-production
       - PNCP_API_URL=https://api.gov.br/pncp/v1
       - PNCP_TOKEN=your-pncp-token-here
+      - LOG_LEVEL=INFO
     depends_on:
       db:
         condition: service_healthy
@@ -89,7 +109,7 @@ services:
   # Celery Beat Scheduler
   celery-beat:
     build: .
-    command: celery -A app.tasks.sync_tasks beat --loglevel=info
+    command: celery -A app.tasks.sync_tasks beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     environment:
       - DATABASE_URL=postgresql://searcb:searcb_password@db:5432/searcb_db
       - REDIS_URL=redis://redis:6379/0
@@ -98,6 +118,7 @@ services:
       - SECRET_KEY=your-secret-key-change-in-production
       - PNCP_API_URL=https://api.gov.br/pncp/v1
       - PNCP_TOKEN=your-pncp-token-here
+      - LOG_LEVEL=INFO
     depends_on:
       db:
         condition: service_healthy
@@ -105,12 +126,13 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
+      - celery_beat_data:/tmp
     restart: unless-stopped
 
   # Celery Flower (Monitoring)
   flower:
     build: .
-    command: celery -A app.tasks.sync_tasks flower --port=5555
+    command: celery -A app.tasks.sync_tasks flower --port=5555 --broker=redis://redis:6379/0
     environment:
       - DATABASE_URL=postgresql://searcb:searcb_password@db:5432/searcb_db
       - REDIS_URL=redis://redis:6379/0
@@ -121,6 +143,7 @@ services:
       - "5555:5555"
     depends_on:
       - redis
+      - celery
     restart: unless-stopped
 
   # Nginx Reverse Proxy
@@ -130,20 +153,35 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
-      - ./logs:/var/log/nginx
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
     depends_on:
       - app
     restart: unless-stopped
 
-  # Prometheus (Optional - for monitoring)
+  # PostgreSQL Admin (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@searcb.gov.br
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # Prometheus (Monitoring)
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -152,17 +190,23 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.size=10GB'
     restart: unless-stopped
 
-  # Grafana (Optional - for monitoring)
+  # Grafana (Dashboard)
   grafana:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-clock-panel
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     depends_on:
       - prometheus
     restart: unless-stopped
@@ -172,6 +216,8 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  pgadmin_data:
+  celery_beat_data:
 
 networks:
   default:
