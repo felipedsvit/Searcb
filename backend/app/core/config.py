@@ -52,10 +52,14 @@ class Settings(BaseSettings):
     
     # CORS Configuration
     BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:8080",
+        "http://localhost:3000",      # React dev server (common)
+        "http://localhost:8080",      # Vue dev server (common)
+        "http://localhost:5173",      # Vite dev server (common)
+        "http://localhost:5174",      # Current frontend port
         "https://localhost:3000",
         "https://localhost:8080",
+        "https://localhost:5173",
+        "https://localhost:5174",
     ]
     
     # Celery Configuration

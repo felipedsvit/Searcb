@@ -288,13 +288,13 @@ export const MainLayout: React.FC = () => {
               fontSize: '0.875rem',
             }}
           >
-            {user ? formatInitials(user.nome) : 'U'}
+            {user ? formatInitials(user.nome || user.email || 'Usuario') : 'U'}
           </Avatar>
           
           {!sidebarCollapsed && (
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="subtitle2" noWrap>
-                {user?.nome}
+                {user?.nome || user?.email || 'Usuário'}
               </Typography>
               <Typography variant="caption" color="textSecondary" noWrap>
                 {user?.perfil}

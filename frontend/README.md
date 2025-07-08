@@ -321,3 +321,10 @@ Para dúvidas sobre desenvolvimento:
 - [ ] CI/CD pipeline
 
 Este frontend foi desenvolvido seguindo rigorosamente as especificações do documento CLAUDE.md, implementando todas as tecnologias recomendadas e seguindo as melhores práticas de desenvolvimento moderno. A arquitetura está preparada para crescer e escalar conforme as necessidades do projeto SEARCB.
+
+
+🎭 Available Test Users
+
+  | Username | Email               | Password | Role  | Description        |
+  |----------|---------------------|----------|-------|--------------------|
+  | admin    | admin@searcb.gov.br | admin123 | Admin | Full system access |

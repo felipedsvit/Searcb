@@ -37,9 +37,12 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         try {
           set({ isLoading: true, error: null });
 
-          const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
+          const response = await apiClient.post<{success: boolean, data: AuthResponse}>('/api/v1/auth/login-json', {
+            username: credentials.email, // Backend accepts email in username field
+            password: credentials.password
+          });
           
-          const { access_token, user } = response;
+          const { access_token, user } = response.data;
 
           // Salvar token e usuário
           localStorage.setItem(TOKEN_KEY, access_token);
@@ -89,8 +92,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             throw new Error('Não há token para renovar');
           }
 
-          const response = await apiClient.post<AuthResponse>('/auth/refresh');
-          const { access_token, user } = response;
+          const response = await apiClient.post<{success: boolean, data: AuthResponse}>('/api/v1/auth/refresh');
+          const { access_token, user } = response.data;
 
           // Atualizar token
           localStorage.setItem(TOKEN_KEY, access_token);
@@ -143,7 +146,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           
           try {
             // Fazer uma requisição simples para verificar se o token é válido
-            await apiClient.get('/auth/me');
+            await apiClient.get('/api/v1/auth/me');
             
             set({
               user,

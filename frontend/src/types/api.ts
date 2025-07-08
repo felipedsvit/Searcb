@@ -17,6 +17,7 @@ export interface User {
   id: number;
   email: string;
   nome: string;
+  nome_completo?: string; // Optional fallback field
   perfil: UserRole;
   ativo: boolean;
   created_at: string;
@@ -132,6 +133,11 @@ export type AtaStatus = typeof AtaStatus[keyof typeof AtaStatus];
 
 export interface LoginCredentials {
   email: string;
+  password: string;
+}
+
+export interface BackendLoginPayload {
+  username: string; // Can be email or username
   password: string;
 }
 

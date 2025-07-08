@@ -9,6 +9,9 @@ from typing import Generator
 
 from .config import settings
 
+# Import models to ensure they're registered with Base
+from ..models import *
+
 logger = logging.getLogger(__name__)
 
 # Create database engine

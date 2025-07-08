@@ -61,6 +61,7 @@ export const formatRelativeTime = (date: string | Date): string => {
 };
 
 export const formatCNPJ = (cnpj: string): string => {
+  if (!cnpj || typeof cnpj !== 'string') return cnpj;
   const cleaned = cnpj.replace(/\D/g, '');
   if (cleaned.length !== 14) return cnpj;
   
@@ -71,6 +72,7 @@ export const formatCNPJ = (cnpj: string): string => {
 };
 
 export const formatCPF = (cpf: string): string => {
+  if (!cpf || typeof cpf !== 'string') return cpf;
   const cleaned = cpf.replace(/\D/g, '');
   if (cleaned.length !== 11) return cpf;
   
@@ -81,6 +83,7 @@ export const formatCPF = (cpf: string): string => {
 };
 
 export const formatPhone = (phone: string): string => {
+  if (!phone || typeof phone !== 'string') return phone;
   const cleaned = phone.replace(/\D/g, '');
   
   if (cleaned.length === 10) {
@@ -117,6 +120,7 @@ export const formatDuration = (seconds: number): string => {
 };
 
 export const formatCEP = (cep: string): string => {
+  if (!cep || typeof cep !== 'string') return cep;
   const cleaned = cep.replace(/\D/g, '');
   if (cleaned.length !== 8) return cep;
   
@@ -158,6 +162,7 @@ export const formatBoolean = (value: boolean): string => {
 };
 
 export const slugify = (text: string): string => {
+  if (!text || typeof text !== 'string') return '';
   return text
     .toString()
     .toLowerCase()
@@ -169,17 +174,26 @@ export const slugify = (text: string): string => {
 };
 
 export const truncate = (text: string, length: number = 100): string => {
+  if (!text || typeof text !== 'string') return '';
   if (text.length <= length) return text;
   return text.substring(0, length) + '...';
 };
 
 export const capitalize = (text: string): string => {
+  if (!text || typeof text !== 'string') return '';
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 };
 
 export const formatInitials = (name: string): string => {
+  // Guard against null/undefined/empty values
+  if (!name || typeof name !== 'string') {
+    return 'U'; // Default initials
+  }
+  
   return name
+    .trim() // Remove leading/trailing spaces
     .split(' ')
+    .filter(word => word.length > 0) // Remove empty strings
     .map(word => word.charAt(0))
     .join('')
     .toUpperCase()
@@ -187,10 +201,12 @@ export const formatInitials = (name: string): string => {
 };
 
 export const cleanString = (text: string): string => {
+  if (!text || typeof text !== 'string') return '';
   return text.replace(/[^\w\s]/gi, '').trim();
 };
 
 export const formatSearchHighlight = (text: string, search: string): string => {
+  if (!text || typeof text !== 'string') return text;
   if (!search) return text;
   
   const regex = new RegExp(`(${search})`, 'gi');
