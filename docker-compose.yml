@@ -3,19 +3,19 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: searcb_db
-      POSTGRES_USER: searcb
-      POSTGRES_PASSWORD: searcb_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql
-      - ./functions.sql:/docker-entrypoint-initdb.d/02_functions.sql
-      - ./indexes.sql:/docker-entrypoint-initdb.d/03_indexes.sql
-      - ./sample_data.sql:/docker-entrypoint-initdb.d/04_sample_data.sql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./backend/functions.sql:/docker-entrypoint-initdb.d/02_functions.sql
+      - ./backend/indexes.sql:/docker-entrypoint-initdb.d/03_indexes.sql
+      - ./backend/sample_data.sql:/docker-entrypoint-initdb.d/04_sample_data.sql
     ports:
-      - "5432:5432"
+      - "${PORT_DB}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U searcb -d searcb_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -41,7 +41,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "${PORT_REDIS}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -49,27 +49,27 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # Main Application
+  # Backend Application
   app:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgresql://searcb:searcb_password@db:5432/searcb_db
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - SECRET_KEY=your-secret-key-change-in-production
-      - ALGORITHM=HS256
-      - ACCESS_TOKEN_EXPIRE_MINUTES=30
-      - PNCP_API_URL=https://api.gov.br/pncp/v1
-      - PNCP_TOKEN=your-pncp-token-here
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - MAX_PAGE_SIZE=500
-      - DEFAULT_PAGE_SIZE=50
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - PNCP_API_URL=${PNCP_API_URL}
+      - PNCP_TOKEN=${PNCP_TOKEN}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - MAX_PAGE_SIZE=${MAX_PAGE_SIZE}
+      - DEFAULT_PAGE_SIZE=${DEFAULT_PAGE_SIZE}
     ports:
-      - "8000:8000"
+      - "${PORT_BACKEND}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -86,21 +86,41 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_APP_NAME=${VITE_APP_NAME}
+      - VITE_APP_VERSION=${VITE_APP_VERSION}
+      - VITE_APP_ENV=${VITE_APP_ENV}
+      - VITE_ENABLE_DEVTOOLS=${VITE_ENABLE_DEVTOOLS}
+      - VITE_ENABLE_WEBSOCKETS=${VITE_ENABLE_WEBSOCKETS}
+      - VITE_PNCP_API_URL=${VITE_PNCP_API_URL}
+      - VITE_MONITORING_URL=${VITE_MONITORING_URL}
+    ports:
+      - "${PORT_FRONTEND}:80"
+    depends_on:
+      - app
+    restart: unless-stopped
+
   # Celery Worker
   celery:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     command: celery -A app.tasks.sync_tasks worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000
     environment:
-      - DATABASE_URL=postgresql://searcb:searcb_password@db:5432/searcb_db
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - SECRET_KEY=your-secret-key-change-in-production
-      - PNCP_API_URL=https://api.gov.br/pncp/v1
-      - PNCP_TOKEN=your-pncp-token-here
-      - LOG_LEVEL=INFO
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - SECRET_KEY=${SECRET_KEY}
+      - PNCP_API_URL=${PNCP_API_URL}
+      - PNCP_TOKEN=${PNCP_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
       db:
         condition: service_healthy
@@ -119,18 +139,18 @@ services:
   # Celery Beat Scheduler
   celery-beat:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     command: celery -A app.tasks.sync_tasks beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     environment:
-      - DATABASE_URL=postgresql://searcb:searcb_password@db:5432/searcb_db
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - SECRET_KEY=your-secret-key-change-in-production
-      - PNCP_API_URL=https://api.gov.br/pncp/v1
-      - PNCP_TOKEN=your-pncp-token-here
-      - LOG_LEVEL=INFO
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - SECRET_KEY=${SECRET_KEY}
+      - PNCP_API_URL=${PNCP_API_URL}
+      - PNCP_TOKEN=${PNCP_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
       db:
         condition: service_healthy
@@ -150,17 +170,17 @@ services:
   # Celery Flower (Monitoring)
   flower:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
-    command: celery -A app.tasks.sync_tasks flower --port=5555 --broker=redis://redis:6379/0
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.tasks.sync_tasks flower --port=5555 --broker=${REDIS_URL}
     environment:
-      - DATABASE_URL=postgresql://searcb:searcb_password@db:5432/searcb_db
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - PNCP_API_URL=https://api.gov.br/pncp/v1
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - PNCP_API_URL=${PNCP_API_URL}
     ports:
-      - "5555:5555"
+      - "${PORT_FLOWER}:5555"
     depends_on:
       - redis
       - celery
@@ -176,11 +196,11 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@searcb.gov.br
-      PGADMIN_DEFAULT_PASSWORD: admin_password
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
-      - "5050:80"
+      - "${PORT_PGADMIN}:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
@@ -191,7 +211,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     ports:
-      - "9090:9090"
+      - "${PORT_PROMETHEUS}:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -209,7 +229,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3000:3000"
+      - "${PORT_GRAFANA}:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_SECURITY_ADMIN_USER=admin
